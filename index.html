@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VPT Live Admin</title>
+<link rel="icon" type="image/png" href="/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -591,10 +592,446 @@
     color: var(--gold);
   }
 
+  /* ── HEADER NAV (tabs Feed / Jugadores) ───────────────────── */
+  .header-nav {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+  }
+  .nav-tab {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .nav-tab:hover { color: var(--white); }
+  .nav-tab.active {
+    background: rgba(201,168,76,.1);
+    border-color: rgba(201,168,76,.3);
+    color: var(--gold);
+  }
+
+  /* ── VIEW SWITCHER ───────────────────────────────────────── */
+  .view { display: none; flex: 1; min-height: calc(100vh - 56px); }
+  .view.active { display: flex; flex-direction: column; }
+  .view.active > .main { flex: 1; }
+
+  /* ── PLAYERS VIEW ─────────────────────────────────────────── */
+  .panel-players {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .players-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .players-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .players-count {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .players-search {
+    margin-left: auto;
+    width: 220px;
+  }
+  .players-search input {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .players-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Fila de jugador en la tabla */
+  .player-row {
+    display: grid;
+    grid-template-columns: 36px 44px 1fr 150px 80px 120px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color .15s;
+    animation: slideIn .25s ease;
+  }
+  .player-row:hover { border-color: var(--border2); }
+  .player-row.is-eliminated { opacity: .55; }
+
+  .player-pos {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--gold);
+    text-align: center;
+  }
+  .player-pos.dim { color: var(--muted); font-weight: 500; }
+
+  .player-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .player-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .player-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .player-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--white);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .player-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .player-flag {
+    display: inline-block;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--white);
+    letter-spacing: .8px;
+  }
+  .player-rank {
+    color: var(--gold-dim);
+    font-size: 10px;
+    letter-spacing: .5px;
+  }
+
+  /* Chip count inline edit */
+  .chip-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .chip-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--white);
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s;
+    min-width: 100px;
+    text-align: right;
+  }
+  .chip-value:hover { background: var(--surface2); }
+  .chip-value.editing { display: none; }
+  .chip-input {
+    width: 130px;
+    padding: 5px 8px !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 13px !important;
+    text-align: right;
+  }
+  .chip-delta {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .chip-delta.up   { color: var(--green); background: rgba(61,186,110,.1); }
+  .chip-delta.down { color: var(--red);   background: rgba(224,82,82,.1); }
+
+  /* Status cell */
+  .status-cell { display: flex; align-items: center; justify-content: center; }
+  .status-pill {
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+  .status-pill.active     { background: rgba(61,186,110,.12);  color: var(--green); border: 1px solid rgba(61,186,110,.3); }
+  .status-pill.eliminated { background: rgba(224,82,82,.12);   color: var(--red);   border: 1px solid rgba(224,82,82,.3); }
+
+  /* Actions cell */
+  .actions-cell { display: flex; gap: 6px; justify-content: flex-end; }
+  .btn-mini {
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-mini:hover     { color: var(--white); border-color: var(--border2); }
+  .btn-mini.danger:hover { color: var(--red);   border-color: var(--red); }
+  .btn-mini.ok:hover     { color: var(--green); border-color: var(--green); }
+
+  /* Add player form search results */
+  .search-results {
+    margin-top: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+  }
+  .search-results.show { display: block; }
+  .search-result {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background .12s;
+  }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover,
+  .search-result.highlight { background: rgba(201,168,76,.08); }
+  .search-result-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--white);
+  }
+  .search-result-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  .search-empty {
+    padding: 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* ── MENTION DROPDOWN (@jugador en textarea) ──────────────── */
+  .mention-dropdown {
+    position: absolute;
+    z-index: 200;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    width: 300px;
+    max-height: 240px;
+    overflow-y: auto;
+    display: none;
+  }
+  .mention-dropdown.show { display: block; }
+  .mention-item {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .mention-item:last-child { border-bottom: none; }
+  .mention-item.highlight,
+  .mention-item:hover { background: rgba(201,168,76,.1); }
+  .mention-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+  .mention-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .mention-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--white);
+  }
+  .mention-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── EDIT MODE (formulario del feed) ──────────────────────── */
+  .edit-mode-indicator {
+    padding: 10px 14px;
+    background: rgba(201,168,76,.1);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    color: var(--gold);
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .edit-mode-indicator .edit-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--muted);
+    text-transform: none;
+  }
+
+  .btn-secondary {
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-secondary:hover { color: var(--red); border-color: var(--red); }
+
+  .post-edit {
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .post-edit:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ── SUB-NAV del panel de jugadores (Leaderboard / Catálogo) ── */
+  .players-subnav {
+    display: flex;
+    gap: 4px;
+  }
+
+  /* Fila en vista catálogo — más simple que .player-row normal */
+  .player-row.catalog-row {
+    grid-template-columns: 44px 1fr 100px;
+  }
+
+  /* ── MODAL (edición de jugador del catálogo) ─────────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: slideIn .15s ease;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    padding: 24px;
+    width: 440px;
+    max-width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--white);
+  }
+  .modal-header .btn-logout { margin-left: auto; }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  /* Render chip de mención dentro de posts del feed */
+  .mention-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    background: rgba(201,168,76,.12);
+    border: 1px solid rgba(201,168,76,.3);
+    border-radius: 4px;
+    color: var(--gold);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
   /* Responsive */
   @media (max-width: 900px) {
     .main { grid-template-columns: 1fr; }
     .panel-feed { min-height: 400px; }
+    .player-row { grid-template-columns: 32px 36px 1fr auto; }
+    .player-row .status-cell,
+    .player-row .actions-cell { grid-column: 1 / -1; justify-content: flex-start; }
   }
 </style>
 </head>
@@ -628,6 +1065,10 @@
       <div class="live-dot"></div>
       LIVE ADMIN
     </div>
+    <nav class="header-nav">
+      <button class="nav-tab active" data-view="feed"    onclick="switchView('feed')">Feed</button>
+      <button class="nav-tab"        data-view="players" onclick="switchView('players')">Jugadores</button>
+    </nav>
     <div class="header-user">
       <div class="user-avatar" id="user-initials">—</div>
       <span id="user-email-display" style="font-size:12px;"></span>
@@ -635,11 +1076,17 @@
     </div>
   </div>
 
+  <!-- ═══════════════════ VIEW: FEED ══════════════════════════════ -->
+  <div id="view-feed" class="view active">
   <div class="main">
 
     <!-- PANEL IZQUIERDO: Formulario -->
     <div class="panel-form">
-      <div class="panel-title">Nuevo Post</div>
+      <div id="edit-indicator" class="edit-mode-indicator" style="display:none;">
+        <span>✏️ EDITANDO POST</span>
+        <span class="edit-meta" id="edit-meta"></span>
+      </div>
+      <div class="panel-title" id="form-title">Nuevo Post</div>
 
       <!-- Festival y Torneo -->
       <div class="select-group">
@@ -708,9 +1155,12 @@
         </div>
       </div>
 
-      <!-- Publicar -->
+      <!-- Publicar / Guardar -->
       <button class="btn-publish" id="publish-btn" onclick="publishPost()">
         <span>⚡</span> Publicar ahora
+      </button>
+      <button class="btn-secondary" id="cancel-edit-btn" onclick="exitEditMode()" style="display:none;">
+        Cancelar edición
       </button>
       <div class="publish-feedback" id="pub-feedback"></div>
     </div>
@@ -735,6 +1185,122 @@
     </div>
 
   </div>
+  </div><!-- /#view-feed -->
+
+  <!-- ═══════════════════ VIEW: PLAYERS ═══════════════════════════ -->
+  <div id="view-players" class="view">
+  <div class="main">
+
+    <!-- PANEL IZQUIERDO: Alta catálogo + Añadir al festival -->
+    <div class="panel-form">
+
+      <div class="panel-title">Nuevo jugador al catálogo</div>
+      <div class="select-group">
+        <input type="text" id="pl-full-name"   placeholder="Nombre completo" />
+        <input type="text" id="pl-nickname"    placeholder="Nick (opcional)" />
+        <div class="info-grid">
+          <div class="info-field">
+            <label>NAC. ISO</label>
+            <input type="text" id="pl-nat" maxlength="2" placeholder="ES" style="text-transform:uppercase;" />
+          </div>
+          <div class="info-field">
+            <label>RANKING VPT</label>
+            <input type="number" id="pl-rank" placeholder="—" />
+          </div>
+        </div>
+        <input type="text" id="pl-photo" placeholder="URL de foto (opcional)" />
+        <button class="btn-primary" onclick="createPlayerFromForm()" style="margin-top:4px;">Añadir al catálogo</button>
+        <div id="pl-create-feedback" class="publish-feedback" style="margin-top:4px;"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="panel-title">Añadir al festival actual</div>
+      <div class="festival-indicator" id="pl-festival-indicator">— Selecciona un festival arriba en el Feed —</div>
+      <div class="select-group" style="margin-top:10px;">
+        <input type="text" id="pl-search" placeholder="Buscar jugador por nombre o nick..." autocomplete="off" />
+        <div id="pl-search-results" class="search-results"></div>
+        <div class="info-grid">
+          <div class="info-field">
+            <label>STACK INICIAL</label>
+            <input type="number" id="pl-chip-init" placeholder="ej. 30000" />
+          </div>
+          <div class="info-field">
+            <label>MESA/SITIO</label>
+            <input type="text" id="pl-seat" placeholder="ej. M3/S5" />
+          </div>
+        </div>
+        <button class="btn-publish" onclick="addSelectedPlayerToFestival()" id="pl-add-btn" disabled style="opacity:.5;">
+          <span>➕</span> Añadir al festival
+        </button>
+        <div id="pl-add-feedback" class="publish-feedback"></div>
+      </div>
+    </div>
+
+    <!-- PANEL DERECHO: Listado y edición rápida -->
+    <div class="panel-players">
+      <div class="players-header">
+        <nav class="players-subnav">
+          <button class="nav-tab active" data-pv="leaderboard" onclick="setPlayersView('leaderboard')">Leaderboard</button>
+          <button class="nav-tab"        data-pv="catalog"     onclick="setPlayersView('catalog')">Catálogo</button>
+        </nav>
+        <div class="players-count" id="pl-count">—</div>
+        <div class="feed-filter" id="pl-lb-filters">
+          <button class="filter-btn active" data-pfilter="active"     onclick="setPlayersFilter('active', this)">Activos</button>
+          <button class="filter-btn"        data-pfilter="eliminated" onclick="setPlayersFilter('eliminated', this)">Eliminados</button>
+          <button class="filter-btn"        data-pfilter="all"        onclick="setPlayersFilter('all', this)">Todos</button>
+        </div>
+        <div class="players-search">
+          <input type="text" id="pl-filter-input" placeholder="Filtrar..." oninput="handlePlayerFilterInput()" />
+        </div>
+      </div>
+      <div class="players-scroll" id="players-scroll">
+        <div class="empty-state" id="players-empty">
+          <div class="empty-icon">🎴</div>
+          <div class="empty-title">Sin jugadores todavía</div>
+          <div class="empty-sub">Selecciona un festival y añade el primer jugador<br>desde el panel de la izquierda</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </div><!-- /#view-players -->
+
+</div>
+
+<!-- Dropdown de autocompletado @jugador -->
+<div id="mention-dropdown" class="mention-dropdown"></div>
+
+<!-- Modal de edición de jugador del catálogo -->
+<div id="player-edit-modal" class="modal-backdrop" style="display:none;" onclick="handleModalBackdropClick(event)">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <div class="modal-title">Editar jugador</div>
+      <button class="btn-logout" onclick="closePlayerEditModal()" title="Cerrar">✕</button>
+    </div>
+    <div class="select-group">
+      <input type="text"   id="pe-full-name" placeholder="Nombre completo" />
+      <input type="text"   id="pe-nickname"  placeholder="Nick (opcional)" />
+      <div class="info-grid">
+        <div class="info-field">
+          <label>NAC. ISO</label>
+          <input type="text" id="pe-nat" maxlength="2" placeholder="ES" style="text-transform:uppercase;" />
+        </div>
+        <div class="info-field">
+          <label>RANKING VPT</label>
+          <input type="number" id="pe-rank" placeholder="—" />
+        </div>
+      </div>
+      <input type="text" id="pe-photo" placeholder="URL de foto (opcional)" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-mini danger" onclick="deleteCatalogPlayer()">Eliminar jugador</button>
+      <div style="flex:1;"></div>
+      <button class="btn-secondary" onclick="closePlayerEditModal()">Cancelar</button>
+      <button class="btn-publish"   onclick="savePlayerEdit()" style="padding:12px 18px;">Guardar</button>
+    </div>
+    <div id="pe-feedback" class="publish-feedback"></div>
+  </div>
 </div>
 
 <script>
@@ -745,12 +1311,12 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── CATEGORÍAS ────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: 'info',       label: 'Información',  icon: 'ℹ️',  color: '#4a9eff', bg: 'rgba(74,158,255,.12)', border: 'rgba(74,158,255,.3)' },
+  { id: 'info',       label: 'Información',  icon: 'ℹ️',  color: '#7ec0ff', bg: 'rgba(126,192,255,.18)', border: 'rgba(126,192,255,.45)' },
   { id: 'chipcount',  label: 'Chip Count',   icon: '📊',  color: '#C9A84C', bg: 'rgba(201,168,76,.12)', border: 'rgba(201,168,76,.3)' },
   { id: 'prize',      label: 'Premios',      icon: '🏆',  color: '#f0852a', bg: 'rgba(240,133,42,.12)', border: 'rgba(240,133,42,.3)' },
   { id: 'result',     label: 'Resultado',    icon: '✅',  color: '#3dba6e', bg: 'rgba(61,186,110,.12)', border: 'rgba(61,186,110,.3)' },
   { id: 'elim',       label: 'Eliminación',  icon: '💀',  color: '#e05252', bg: 'rgba(224,82,82,.12)',  border: 'rgba(224,82,82,.3)'  },
-  { id: 'announce',   label: 'Anuncio',      icon: '📢',  color: '#9b6dff', bg: 'rgba(155,109,255,.12)',border: 'rgba(155,109,255,.3)' },
+  { id: 'announce',   label: 'Anuncio',      icon: '📢',  color: '#c0a6ff', bg: 'rgba(192,166,255,.18)', border: 'rgba(192,166,255,.45)' },
   { id: 'levelup',    label: 'Nuevo Nivel',  icon: '🔼',  color: '#2dcec8', bg: 'rgba(45,206,200,.12)', border: 'rgba(45,206,200,.3)'  },
   { id: 'other',      label: 'Otro',         icon: '➕',  color: '#5a6278', bg: 'rgba(90,98,120,.12)',  border: 'rgba(90,98,120,.3)'   },
 ];
@@ -760,6 +1326,7 @@ let currentFilter = 'all';
 let allPosts = [];
 let festivals = [];
 let refreshInterval = null;
+let editingPostId = null;  // null = modo nuevo; UUID = modo edición
 
 // ── INIT CATEGORÍAS ───────────────────────────────────────────
 function initCats() {
@@ -902,6 +1469,7 @@ async function login() {
 async function logout() {
   await sb.auth.signOut();
   clearInterval(refreshInterval);
+  unsubscribeFestivalPlayersRealtime();
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -915,8 +1483,11 @@ function showApp(user, adminName) {
   document.getElementById('user-email-display').textContent = adminName ? adminName + ' · ' + user.email : user.email;
 
   initCats();
-  loadFestivals();
+  loadFestivals().then(() => syncPlayersFestivalIndicator());
   loadPosts();
+  loadPlayersCatalog();
+  setupMentionAutocomplete();
+  initPlayerSearchForm();
   // Refresco automático cada 15 segundos
   refreshInterval = setInterval(loadPosts, 15000);
 }
@@ -938,6 +1509,12 @@ async function loadFestivals() {
 
 function onFestivalChange() {
   if (currentFilter === 'festival') loadPosts();
+  // Si la vista de Jugadores está abierta (o abierta después), refrescar
+  syncPlayersFestivalIndicator();
+  if (document.getElementById('view-players').classList.contains('active')) {
+    loadFestivalPlayers();
+    subscribeFestivalPlayersRealtime();
+  }
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -960,19 +1537,21 @@ async function loadPosts() {
 
 function renderPosts() {
   const scroll = document.getElementById('feed-scroll');
-  const empty  = document.getElementById('empty-state');
   const count  = document.getElementById('feed-count');
+  if (!scroll || !count) return;  // por si el DOM aún no está montado
 
   count.textContent = `${allPosts.length} post${allPosts.length !== 1 ? 's' : ''}`;
 
   if (allPosts.length === 0) {
-    scroll.innerHTML = '';
-    scroll.appendChild(empty);
-    empty.style.display = 'flex';
+    scroll.innerHTML = `
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">Sin posts todavía</div>
+        <div class="empty-sub">Selecciona un festival y publica<br>el primer update en directo</div>
+      </div>`;
     return;
   }
 
-  empty.style.display = 'none';
   scroll.innerHTML = '';
   allPosts.forEach(p => scroll.appendChild(buildPostCard(p)));
 }
@@ -993,11 +1572,12 @@ function buildPostCard(post) {
       <span class="post-cat-badge" style="background:${cat.bg};color:${cat.color};border:1px solid ${cat.border}">${cat.icon || ''} ${cat.label}</span>
       ${tournament ? `<span class="post-tournament">· ${tournament}</span>` : ''}
       <span class="post-time">${timeStr}</span>
+      <button class="post-edit"   onclick="enterEditMode('${post.id}')" title="Editar">✏️</button>
       <button class="post-delete" onclick="deletePost('${post.id}', this)" title="Eliminar">✕</button>
     </div>
     <div class="post-body">
-      ${post.title ? `<div class="post-title-text">${post.title}</div>` : ''}
-      ${post.body ? `<div class="post-body-text">${post.body}</div>` : ''}
+      ${post.title ? `<div class="post-title-text">${escapeHtml(post.title)}</div>` : ''}
+      ${post.body ? `<div class="post-body-text">${renderBodyWithMentions(post.body)}</div>` : ''}
       ${extra && Object.keys(extra).length > 0 ? `
         <div class="post-extra">
           ${extra.Nivel     ? `<div class="extra-stat"><div class="extra-label">Nivel</div><div class="extra-value">${extra.Nivel}</div></div>` : ''}
@@ -1006,7 +1586,11 @@ function buildPostCard(post) {
           ${extra.Blinds    ? `<div class="extra-stat"><div class="extra-label">Blinds</div><div class="extra-value">${extra.Blinds}</div></div>` : ''}
           ${extra.Torneo    ? `<div class="extra-stat"><div class="extra-label">Torneo</div><div class="extra-value">${extra.Torneo}</div></div>` : ''}
         </div>` : ''}
-    </div>`;
+    </div>
+    ${post.image_url ? `
+      <div class="post-image">
+        <img src="${escapeAttr(post.image_url)}" alt="" loading="lazy">
+      </div>` : ''}`;
   return card;
 }
 
@@ -1042,13 +1626,14 @@ async function publishPost() {
   if (blinds)   extra['Blinds'] = blinds;
 
   const btn = document.getElementById('publish-btn');
+  const editing = !!editingPostId;
   btn.disabled = true;
-  btn.innerHTML = '<span>⏳</span> Publicando...';
+  btn.innerHTML = editing ? '<span>⏳</span> Guardando...' : '<span>⏳</span> Publicando...';
 
   // Imagen Flickr
   const imageUrl = document.getElementById('flickr-resolved-url')?.value || null;
 
-  const { error } = await sb.from('live_updates').insert({
+  const payload = {
     festival_id: festivalId,
     type,
     title: title || null,
@@ -1056,18 +1641,49 @@ async function publishPost() {
     extra: Object.keys(extra).length > 0 ? extra : null,
     image_url: imageUrl,
     published: true,
-  });
+  };
+
+  let error = null;
+  let postId = editingPostId;  // en edición ya lo tenemos; en alta lo recibimos de Supabase
+  if (editing) {
+    // NO usamos .single() aquí: si la RLS de live_updates impide leer la
+    // fila de vuelta, PostgREST devolvería 0 filas y .single() lanzaría
+    // "Cannot coerce the result to a single JSON object".
+    // Para enlazar las menciones ya tenemos editingPostId — no hace falta releer.
+    const res = await sb.from('live_updates')
+      .update(payload)
+      .eq('id', editingPostId);
+    error = res.error;
+  } else {
+    const res = await sb.from('live_updates')
+      .insert(payload)
+      .select('id')
+      .single();
+    error = res.error;
+    postId = res.data?.id;
+  }
 
   btn.disabled = false;
-  btn.innerHTML = '<span>⚡</span> Publicar ahora';
+  btn.innerHTML = editing ? '<span>💾</span> Guardar cambios' : '<span>⚡</span> Publicar ahora';
 
   if (error) {
-    showFeedback('Error al publicar: ' + error.message, 'err');
+    showFeedback((editing ? 'Error al guardar: ' : 'Error al publicar: ') + error.message, 'err');
     return;
   }
 
-  showFeedback('✓ Publicado correctamente', 'ok');
-  clearForm();
+  // Persistir menciones @jugador presentes en el body (DELETE + INSERT sirve tanto para alta como edición)
+  if (postId) {
+    try { await syncMentionsForUpdate(postId, body); }
+    catch (e) { console.warn('syncMentions failed', e); }
+  }
+
+  if (editing) {
+    showFeedback('✓ Post actualizado', 'ok');
+    exitEditMode();
+  } else {
+    showFeedback('✓ Publicado correctamente', 'ok');
+    clearForm();
+  }
   loadPosts();
 }
 
@@ -1093,21 +1709,808 @@ function showFeedback(msg, type) {
   setTimeout(() => el.style.display = 'none', 3500);
 }
 
+// ── EDIT MODE ─────────────────────────────────────────────────
+function enterEditMode(postId) {
+  const post = allPosts.find(p => p.id === postId);
+  if (!post) return;
+  editingPostId = postId;
+
+  // Si el admin estaba en la vista Jugadores, saltar a Feed para editar
+  if (document.getElementById('view-players').classList.contains('active')) {
+    switchView('feed');
+  }
+
+  // Rellenar formulario
+  const sel = document.getElementById('sel-festival');
+  if (sel) sel.value = post.festival_id || '';
+  document.getElementById('input-tournament').value = post.extra?.Torneo || '';
+  document.getElementById('input-title').value      = post.title || '';
+  document.getElementById('input-body').value       = post.body || '';
+  document.getElementById('extra-nivel').value      = post.extra?.Nivel     || '';
+  document.getElementById('extra-players').value    = post.extra?.Jugadores || '';
+  document.getElementById('extra-media').value      = post.extra?.Media     || '';
+  document.getElementById('extra-blinds').value     = post.extra?.Blinds    || '';
+
+  // Categoría: si existe en el array la selecciono, si no es "other" con el texto custom
+  const catExists = CATEGORIES.some(c => c.id === post.type);
+  if (catExists) {
+    selectCat(post.type);
+    document.getElementById('cat-extra-input').value = '';
+  } else {
+    selectCat('other');
+    document.getElementById('cat-extra-input').value = post.type || '';
+  }
+
+  // Imagen
+  const flickrInput = document.getElementById('input-flickr-url');
+  const resolved    = document.getElementById('flickr-resolved-url');
+  const preview     = document.getElementById('flickr-preview');
+  const img         = document.getElementById('flickr-img');
+  const status      = document.getElementById('flickr-status');
+  if (post.image_url) {
+    flickrInput.value = post.image_url;
+    if (resolved) resolved.value = post.image_url;
+    if (img)    { img.src = post.image_url; img.style.display = 'block'; }
+    if (status) status.textContent = '✓ Imagen actual del post (pega otro URL de Flickr para cambiarla)';
+    if (preview) preview.style.display = 'block';
+  } else {
+    flickrInput.value = '';
+    if (resolved) resolved.value = '';
+    if (preview)  preview.style.display = 'none';
+  }
+
+  // UI: indicador + botón guardar + botón cancelar
+  const dt = new Date(post.created_at);
+  const catObj = CATEGORIES.find(c => c.id === post.type) || { label: post.type };
+  const timeStr = `${dt.getDate()}/${dt.getMonth()+1} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  const meta = document.getElementById('edit-meta');
+  if (meta) meta.textContent = `${catObj.label || post.type || '—'} · ${timeStr}`;
+  document.getElementById('edit-indicator').style.display = 'flex';
+  document.getElementById('form-title').textContent = 'Editando post existente';
+  document.getElementById('publish-btn').innerHTML = '<span>💾</span> Guardar cambios';
+  document.getElementById('cancel-edit-btn').style.display = 'block';
+
+  // Scroll arriba y foco
+  const panel = document.querySelector('.panel-form');
+  if (panel) panel.scrollTop = 0;
+  document.getElementById('input-title').focus();
+}
+
+function exitEditMode() {
+  editingPostId = null;
+
+  // Reset completo del formulario
+  document.getElementById('input-title').value      = '';
+  document.getElementById('input-body').value       = '';
+  document.getElementById('input-tournament').value = '';
+  document.getElementById('extra-nivel').value      = '';
+  document.getElementById('extra-players').value    = '';
+  document.getElementById('extra-media').value      = '';
+  document.getElementById('extra-blinds').value     = '';
+  document.getElementById('input-flickr-url').value = '';
+  document.getElementById('flickr-preview').style.display = 'none';
+  const resolved = document.getElementById('flickr-resolved-url');
+  if (resolved) resolved.value = '';
+  document.getElementById('cat-extra-input').value = '';
+
+  // Deseleccionar categoría
+  selectedCat = null;
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.classList.remove('active');
+    b.style.borderColor = 'transparent';
+    b.style.background  = 'var(--surface2)';
+    b.style.color       = 'var(--muted)';
+  });
+  document.getElementById('cat-extra-wrap').classList.remove('show');
+
+  // UI
+  document.getElementById('edit-indicator').style.display = 'none';
+  document.getElementById('form-title').textContent = 'Nuevo Post';
+  document.getElementById('publish-btn').innerHTML = '<span>⚡</span> Publicar ahora';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
+}
+
 // ── ELIMINAR ──────────────────────────────────────────────────
 async function deletePost(id, btn) {
   if (!confirm('¿Eliminar este post del feed en directo?')) return;
   btn.textContent = '...';
   await sb.from('live_updates').delete().eq('id', id);
+  if (editingPostId === id) exitEditMode();
   loadPosts();
 }
 
 // ── FILTRO ────────────────────────────────────────────────────
 function setFilter(filter, btn) {
   currentFilter = filter;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  // Scope solo a los filter-btn del feed, no tocar los de otras vistas
+  document.querySelectorAll('#view-feed .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   loadPosts();
 }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  MÓDULO JUGADORES                                            ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+let playersCatalog = [];           // cache del catálogo global
+let festivalPlayers = [];          // filas de v_festival_leaderboard del festival actual
+let playersFilter = 'active';      // active | eliminated | all
+let playersView = 'leaderboard';   // leaderboard | catalog — sub-tab dentro de #view-players
+let selectedCatalogPlayer = null;  // jugador elegido en el form "Añadir al festival"
+let editingPlayerId = null;        // jugador del catálogo abierto en el modal de edición
+let playersRealtimeChannel = null;
+
+// ── SWITCH VIEW ──────────────────────────────────────────────
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === name)
+  );
+  if (name === 'players') {
+    syncPlayersFestivalIndicator();
+    loadPlayersCatalog();
+    loadFestivalPlayers();
+    subscribeFestivalPlayersRealtime();
+  } else {
+    unsubscribeFestivalPlayersRealtime();
+  }
+}
+
+function syncPlayersFestivalIndicator() {
+  const ind = document.getElementById('pl-festival-indicator');
+  if (!ind) return;
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) { ind.textContent = '— Selecciona un festival en la vista Feed —'; return; }
+  const f = festivals.find(x => x.id === fid);
+  if (f) ind.innerHTML = `${f.flag_emoji || '🎴'} <strong>${escapeHtml(f.title)}</strong>${f.is_live ? ' · 🟢 LIVE' : ''}`;
+}
+
+// ── CATÁLOGO GLOBAL ──────────────────────────────────────────
+async function loadPlayersCatalog() {
+  const { data, error } = await sb.from('players').select('*').order('full_name');
+  if (error) { console.warn('loadPlayersCatalog', error); return; }
+  playersCatalog = data || [];
+  // Re-render si estamos en la vista catálogo
+  if (playersView === 'catalog') renderCatalogList();
+}
+
+async function createPlayerFromForm() {
+  const full_name       = document.getElementById('pl-full-name').value.trim();
+  const nickname        = document.getElementById('pl-nickname').value.trim() || null;
+  const natRaw          = document.getElementById('pl-nat').value.trim().toUpperCase();
+  const nationality_iso = natRaw || null;
+  const rankRaw         = document.getElementById('pl-rank').value.trim();
+  const vpt_ranking     = rankRaw ? parseInt(rankRaw, 10) : null;
+  const photo_url       = document.getElementById('pl-photo').value.trim() || null;
+
+  if (!full_name) return playerFeedback('pl-create-feedback', 'Falta el nombre completo', 'err');
+  if (nationality_iso && !/^[A-Z]{2}$/.test(nationality_iso)) {
+    return playerFeedback('pl-create-feedback', 'Nacionalidad: ISO 2 letras (ej. ES, US)', 'err');
+  }
+
+  const { error } = await sb.from('players').insert({
+    full_name, nickname, nationality_iso, vpt_ranking, photo_url,
+  });
+  if (error) return playerFeedback('pl-create-feedback', 'Error: ' + error.message, 'err');
+
+  playerFeedback('pl-create-feedback', '✓ Añadido al catálogo', 'ok');
+  ['pl-full-name','pl-nickname','pl-nat','pl-rank','pl-photo'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  loadPlayersCatalog();
+}
+
+function playerFeedback(elId, msg, type) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + type;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+// ── FORM "Añadir al festival": buscador + alta ──────────────
+function initPlayerSearchForm() {
+  const input   = document.getElementById('pl-search');
+  const results = document.getElementById('pl-search-results');
+  if (!input || !results) return;
+
+  input.addEventListener('input', () => {
+    selectedCatalogPlayer = null;
+    setAddBtnDisabled(true);
+    const q = input.value.trim().toLowerCase();
+    if (!q) { results.classList.remove('show'); results.innerHTML = ''; return; }
+    const matches = playersCatalog.filter(p =>
+      (p.full_name || '').toLowerCase().includes(q) ||
+      (p.nickname  || '').toLowerCase().includes(q)
+    ).slice(0, 8);
+
+    if (matches.length === 0) {
+      results.innerHTML = '<div class="search-empty">Sin resultados · crea el jugador arriba</div>';
+    } else {
+      results.innerHTML = matches.map(p => `
+        <div class="search-result" data-id="${p.id}">
+          <div class="mention-avatar">${p.photo_url ? `<img src="${escapeAttr(p.photo_url)}">` : initialsOf(p.full_name)}</div>
+          <div>
+            <div class="search-result-name">${escapeHtml(p.full_name)}${p.nickname ? ` <span class="search-result-sub">"${escapeHtml(p.nickname)}"</span>` : ''}</div>
+            <div class="search-result-sub">${p.nationality_iso || '—'}${p.vpt_ranking ? ` · #${p.vpt_ranking} VPT` : ''}</div>
+          </div>
+        </div>
+      `).join('');
+      results.querySelectorAll('.search-result').forEach(el => {
+        el.onclick = () => {
+          const id = el.dataset.id;
+          selectedCatalogPlayer = playersCatalog.find(p => p.id === id) || null;
+          input.value = selectedCatalogPlayer?.full_name || '';
+          results.classList.remove('show');
+          setAddBtnDisabled(!selectedCatalogPlayer);
+        };
+      });
+    }
+    results.classList.add('show');
+  });
+
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+      results.classList.remove('show');
+    }
+  });
+}
+
+function setAddBtnDisabled(dis) {
+  const b = document.getElementById('pl-add-btn');
+  if (!b) return;
+  b.disabled = dis;
+  b.style.opacity = dis ? .5 : 1;
+}
+
+async function addSelectedPlayerToFestival() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return playerFeedback('pl-add-feedback', 'Selecciona un festival en la vista Feed', 'err');
+  if (!selectedCatalogPlayer) return playerFeedback('pl-add-feedback', 'Elige un jugador del catálogo', 'err');
+
+  const chipRaw    = document.getElementById('pl-chip-init').value.trim();
+  const chip_count = chipRaw ? parseInt(chipRaw, 10) : 0;
+  const seat_info  = document.getElementById('pl-seat').value.trim() || null;
+
+  const { error } = await sb.from('festival_players').insert({
+    festival_id: fid,
+    player_id:   selectedCatalogPlayer.id,
+    chip_count,
+    seat_info,
+  });
+  if (error) {
+    if (error.code === '23505') {
+      return playerFeedback('pl-add-feedback', 'Este jugador ya está en el festival', 'err');
+    }
+    return playerFeedback('pl-add-feedback', 'Error: ' + error.message, 'err');
+  }
+
+  playerFeedback('pl-add-feedback', '✓ Añadido al festival', 'ok');
+  document.getElementById('pl-search').value    = '';
+  document.getElementById('pl-chip-init').value = '';
+  document.getElementById('pl-seat').value      = '';
+  selectedCatalogPlayer = null;
+  setAddBtnDisabled(true);
+  loadFestivalPlayers();
+}
+
+// ── LEADERBOARD: carga + render + edición inline ─────────────
+async function loadFestivalPlayers() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) { festivalPlayers = []; renderFestivalPlayers(); return; }
+  const { data, error } = await sb
+    .from('v_festival_leaderboard')
+    .select('*')
+    .eq('festival_id', fid);
+  if (error) { console.warn('loadFestivalPlayers', error); return; }
+  // Orden: activos primero por position, luego eliminados al final
+  const rows = data || [];
+  rows.sort((a, b) => {
+    const sa = a.status === 'active' ? 0 : 1;
+    const sb = b.status === 'active' ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    if (a.status === 'active') return (a.position || 0) - (b.position || 0);
+    return (b.chip_count || 0) - (a.chip_count || 0);
+  });
+  festivalPlayers = rows;
+  renderCurrentPlayersView();
+}
+
+function renderCurrentPlayersView() {
+  if (playersView === 'catalog') renderCatalogList();
+  else renderFestivalPlayers();
+}
+
+function setPlayersFilter(f, btn) {
+  playersFilter = f;
+  document.querySelectorAll('#view-players .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFestivalPlayers();
+}
+
+function setPlayersView(view) {
+  playersView = view;
+  document.querySelectorAll('#view-players .players-subnav .nav-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.pv === view)
+  );
+  // Los filtros Activos/Eliminados/Todos solo aplican al leaderboard
+  const filters = document.getElementById('pl-lb-filters');
+  if (filters) filters.style.display = view === 'leaderboard' ? '' : 'none';
+  // Placeholder del buscador cambia según contexto
+  const searchInput = document.getElementById('pl-filter-input');
+  if (searchInput) searchInput.placeholder = view === 'catalog' ? 'Buscar en catálogo…' : 'Filtrar…';
+  renderCurrentPlayersView();
+}
+
+function handlePlayerFilterInput() {
+  renderCurrentPlayersView();
+}
+
+// Render del catálogo global (vista sub-tab "Catálogo")
+function renderCatalogList() {
+  const scroll  = document.getElementById('players-scroll');
+  const countEl = document.getElementById('pl-count');
+  if (!scroll || !countEl) return;
+
+  const search = (document.getElementById('pl-filter-input')?.value || '').trim().toLowerCase();
+  const filtered = playersCatalog.filter(p => {
+    if (!search) return true;
+    return (p.full_name || '').toLowerCase().includes(search) ||
+           (p.nickname  || '').toLowerCase().includes(search);
+  });
+
+  countEl.textContent = `${playersCatalog.length} en catálogo`;
+
+  if (filtered.length === 0) {
+    const empty = playersCatalog.length === 0
+      ? { t: 'Catálogo vacío', s: 'Añade el primer jugador desde el panel de la izquierda' }
+      : { t: 'Ninguno coincide', s: 'Prueba con otro término de búsqueda' };
+    scroll.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📇</div>
+        <div class="empty-title">${empty.t}</div>
+        <div class="empty-sub">${empty.s}</div>
+      </div>`;
+    return;
+  }
+
+  scroll.innerHTML = '';
+  filtered.forEach(p => scroll.appendChild(buildCatalogRow(p)));
+}
+
+function buildCatalogRow(p) {
+  const row = document.createElement('div');
+  row.className = 'player-row catalog-row';
+  row.dataset.id = p.id;
+  const avatar = p.photo_url
+    ? `<img src="${escapeAttr(p.photo_url)}" alt="">`
+    : initialsOf(p.full_name);
+  row.innerHTML = `
+    <div class="player-avatar">${avatar}</div>
+    <div class="player-main">
+      <div class="player-name">${escapeHtml(p.full_name)}${p.nickname ? ` <span class="player-rank">"${escapeHtml(p.nickname)}"</span>` : ''}</div>
+      <div class="player-sub">
+        ${p.nationality_iso ? `<span class="player-flag">${p.nationality_iso}</span>` : ''}
+        ${p.vpt_ranking ? `<span class="player-rank">#${p.vpt_ranking} VPT</span>` : ''}
+      </div>
+    </div>
+    <div class="actions-cell">
+      <button class="btn-mini" onclick="openPlayerEditModal('${p.id}')">EDITAR</button>
+    </div>`;
+  return row;
+}
+
+// ── MODAL: edición del catálogo ──────────────────────────────
+function openPlayerEditModal(playerId) {
+  const p = playersCatalog.find(x => x.id === playerId);
+  if (!p) return;
+  editingPlayerId = playerId;
+  document.getElementById('pe-full-name').value = p.full_name || '';
+  document.getElementById('pe-nickname').value  = p.nickname  || '';
+  document.getElementById('pe-nat').value       = p.nationality_iso || '';
+  document.getElementById('pe-rank').value      = p.vpt_ranking ?? '';
+  document.getElementById('pe-photo').value     = p.photo_url || '';
+  const fb = document.getElementById('pe-feedback');
+  if (fb) fb.style.display = 'none';
+  document.getElementById('player-edit-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('pe-full-name').focus(), 50);
+}
+
+function closePlayerEditModal() {
+  editingPlayerId = null;
+  document.getElementById('player-edit-modal').style.display = 'none';
+}
+
+function handleModalBackdropClick(e) {
+  // Cerrar al hacer click en el backdrop (la llamada desde la modal interna hace stopPropagation)
+  if (e.target === e.currentTarget) closePlayerEditModal();
+}
+
+async function savePlayerEdit() {
+  if (!editingPlayerId) return;
+  const full_name = document.getElementById('pe-full-name').value.trim();
+  const nickname  = document.getElementById('pe-nickname').value.trim() || null;
+  const natRaw    = document.getElementById('pe-nat').value.trim().toUpperCase();
+  const nationality_iso = natRaw || null;
+  const rankRaw   = document.getElementById('pe-rank').value.trim();
+  const vpt_ranking = rankRaw ? parseInt(rankRaw, 10) : null;
+  const photo_url = document.getElementById('pe-photo').value.trim() || null;
+
+  if (!full_name) return playerFeedback('pe-feedback', 'Falta el nombre completo', 'err');
+  if (nationality_iso && !/^[A-Z]{2}$/.test(nationality_iso)) {
+    return playerFeedback('pe-feedback', 'Nacionalidad: ISO 2 letras (ej. ES)', 'err');
+  }
+
+  const { error } = await sb.from('players')
+    .update({ full_name, nickname, nationality_iso, vpt_ranking, photo_url })
+    .eq('id', editingPlayerId);
+
+  if (error) return playerFeedback('pe-feedback', 'Error: ' + error.message, 'err');
+
+  playerFeedback('pe-feedback', '✓ Guardado', 'ok');
+  await loadPlayersCatalog();
+  // El nombre/foto del jugador aparecen también en el leaderboard (vía v_festival_leaderboard)
+  loadFestivalPlayers();
+  setTimeout(closePlayerEditModal, 700);
+}
+
+async function deleteCatalogPlayer() {
+  if (!editingPlayerId) return;
+  const p = playersCatalog.find(x => x.id === editingPlayerId);
+  const name = p?.full_name || 'este jugador';
+  const ok = confirm(
+    `Esto eliminará a "${name}" del catálogo global, de todos los festivales ` +
+    `donde esté participando, y todo su histórico de fichas. ¿Continuar?`
+  );
+  if (!ok) return;
+
+  const { error } = await sb.from('players').delete().eq('id', editingPlayerId);
+  if (error) return playerFeedback('pe-feedback', 'Error: ' + error.message, 'err');
+
+  await loadPlayersCatalog();
+  loadFestivalPlayers();
+  closePlayerEditModal();
+}
+
+function renderFestivalPlayers() {
+  const scroll  = document.getElementById('players-scroll');
+  const countEl = document.getElementById('pl-count');
+  if (!scroll || !countEl) return;  // por si el DOM aún no está montado
+
+  const search = (document.getElementById('pl-filter-input')?.value || '').trim().toLowerCase();
+
+  const filtered = festivalPlayers.filter(r => {
+    if (playersFilter === 'active'     && r.status !== 'active')     return false;
+    if (playersFilter === 'eliminated' && r.status !== 'eliminated') return false;
+    if (search) {
+      const hay = `${r.full_name || ''} ${r.nickname || ''}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const activos    = festivalPlayers.filter(r => r.status === 'active').length;
+  const eliminados = festivalPlayers.filter(r => r.status === 'eliminated').length;
+  countEl.textContent = `${activos} activos · ${eliminados} eliminados`;
+
+  if (filtered.length === 0) {
+    const emptyTitle = festivalPlayers.length === 0
+      ? 'Sin jugadores todavía'
+      : 'Ninguno coincide con el filtro';
+    const emptySub = festivalPlayers.length === 0
+      ? 'Selecciona un festival y añade el primer jugador<br>desde el panel de la izquierda'
+      : 'Prueba con otro filtro o búsqueda';
+    scroll.innerHTML = `
+      <div class="empty-state" id="players-empty">
+        <div class="empty-icon">🎴</div>
+        <div class="empty-title">${emptyTitle}</div>
+        <div class="empty-sub">${emptySub}</div>
+      </div>`;
+    return;
+  }
+
+  scroll.innerHTML = '';
+  filtered.forEach(r => scroll.appendChild(buildPlayerRow(r)));
+}
+
+function buildPlayerRow(r) {
+  const row = document.createElement('div');
+  row.className = 'player-row' + (r.status === 'eliminated' ? ' is-eliminated' : '');
+  row.dataset.id = r.festival_player_id;
+
+  const avatar = r.photo_url
+    ? `<img src="${escapeAttr(r.photo_url)}" alt="">`
+    : initialsOf(r.full_name);
+
+  const delta = r.last_delta;
+  const deltaHtml = (delta === null || delta === undefined || delta === 0)
+    ? ''
+    : `<span class="chip-delta ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'} ${formatChips(Math.abs(delta))}</span>`;
+
+  row.innerHTML = `
+    <div class="player-pos ${r.status === 'eliminated' ? 'dim' : ''}">${r.position ?? '—'}</div>
+    <div class="player-avatar">${avatar}</div>
+    <div class="player-main">
+      <div class="player-name">${escapeHtml(r.full_name)}${r.nickname ? ` <span class="player-rank">"${escapeHtml(r.nickname)}"</span>` : ''}</div>
+      <div class="player-sub">
+        ${r.nationality_iso ? `<span class="player-flag">${r.nationality_iso}</span>` : ''}
+        ${r.vpt_ranking ? `<span class="player-rank">#${r.vpt_ranking} VPT</span>` : ''}
+        ${r.seat_info ? `<span>· ${escapeHtml(r.seat_info)}</span>` : ''}
+      </div>
+    </div>
+    <div class="chip-cell">
+      <div class="chip-value" title="Click para editar">${formatChips(r.chip_count)}</div>
+      <input class="chip-input" type="number" style="display:none;" value="${r.chip_count}">
+      ${deltaHtml}
+    </div>
+    <div class="status-cell">
+      <span class="status-pill ${r.status}">${r.status === 'active' ? 'EN JUEGO' : 'OUT'}</span>
+    </div>
+    <div class="actions-cell">
+      ${r.status === 'active'
+        ? `<button class="btn-mini danger" onclick="markEliminated('${r.festival_player_id}')">OUT</button>`
+        : `<button class="btn-mini ok"     onclick="revivePlayer('${r.festival_player_id}')">REVIVIR</button>`}
+      <button class="btn-mini" onclick="removeFromFestival('${r.festival_player_id}')" title="Quitar del festival">✕</button>
+    </div>`;
+
+  // Inline edit del chip_count
+  const display = row.querySelector('.chip-value');
+  const input   = row.querySelector('.chip-input');
+  display.onclick = () => {
+    display.style.display = 'none';
+    input.style.display = '';
+    input.focus();
+    input.select();
+  };
+  const finish = async (save) => {
+    if (!save) {
+      input.value = r.chip_count;
+    } else {
+      const next = parseInt(input.value, 10);
+      if (Number.isFinite(next) && next !== r.chip_count) {
+        const { error } = await sb.from('festival_players')
+          .update({ chip_count: next })
+          .eq('id', r.festival_player_id);
+        if (error) alert('Error al actualizar chip count: ' + error.message);
+      }
+    }
+    input.style.display = 'none';
+    display.style.display = '';
+  };
+  input.onblur = () => finish(true);
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter')       { e.preventDefault(); input.blur(); }
+    else if (e.key === 'Escape') { finish(false); }
+  };
+  return row;
+}
+
+async function markEliminated(festivalPlayerId) {
+  if (!confirm('¿Marcar como ELIMINADO? Se pondrá el chip_count a 0.')) return;
+  const { error } = await sb.from('festival_players')
+    .update({ status: 'eliminated', chip_count: 0 })
+    .eq('id', festivalPlayerId);
+  if (error) alert('Error: ' + error.message);
+  // Realtime refrescará automáticamente; fallback manual por si no está suscrito:
+  loadFestivalPlayers();
+}
+
+async function revivePlayer(festivalPlayerId) {
+  const { error } = await sb.from('festival_players')
+    .update({ status: 'active' })
+    .eq('id', festivalPlayerId);
+  if (error) alert('Error: ' + error.message);
+  loadFestivalPlayers();
+}
+
+async function removeFromFestival(festivalPlayerId) {
+  if (!confirm('¿Quitar este jugador del festival? Se borrará su histórico de fichas.')) return;
+  const { error } = await sb.from('festival_players').delete().eq('id', festivalPlayerId);
+  if (error) alert('Error: ' + error.message);
+  loadFestivalPlayers();
+}
+
+// ── REALTIME: cambios en festival_players ────────────────────
+function subscribeFestivalPlayersRealtime() {
+  unsubscribeFestivalPlayersRealtime();
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return;
+  playersRealtimeChannel = sb.channel('festival_players:' + fid)
+    .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'festival_players', filter: `festival_id=eq.${fid}` },
+        () => loadFestivalPlayers())
+    .subscribe();
+}
+
+function unsubscribeFestivalPlayersRealtime() {
+  if (playersRealtimeChannel) {
+    try { sb.removeChannel(playersRealtimeChannel); } catch(_) {}
+    playersRealtimeChannel = null;
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  MENCIONES @jugador en textarea                              ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const mentionState = { active: false, anchor: -1, query: '', items: [], highlight: 0, textarea: null };
+
+function setupMentionAutocomplete() {
+  const ta = document.getElementById('input-body');
+  if (!ta) return;
+  ta.addEventListener('input',   handleMentionInput);
+  ta.addEventListener('keydown', handleMentionKeydown);
+  ta.addEventListener('blur',    () => setTimeout(closeMentionDropdown, 150));
+  window.addEventListener('scroll', () => {
+    if (mentionState.active) positionMentionDropdown(mentionState.textarea);
+  }, true);
+}
+
+function handleMentionInput(e) {
+  const ta   = e.target;
+  const text = ta.value;
+  const pos  = ta.selectionStart;
+  const upToCursor = text.slice(0, pos);
+  // Match: @ al inicio o tras espacio, seguido de texto sin espacios/@/[
+  const m = upToCursor.match(/(?:^|\s)@([^\s@\[]*)$/);
+  if (!m) { closeMentionDropdown(); return; }
+  mentionState.active    = true;
+  mentionState.anchor    = pos - m[1].length - 1; // posición del @
+  mentionState.query     = m[1];
+  mentionState.textarea  = ta;
+  mentionState.highlight = 0;
+  openMentionDropdown(ta);
+}
+
+function handleMentionKeydown(e) {
+  if (!mentionState.active) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    mentionState.highlight = Math.min(mentionState.highlight + 1, Math.max(mentionState.items.length - 1, 0));
+    renderMentionDropdown();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    mentionState.highlight = Math.max(mentionState.highlight - 1, 0);
+    renderMentionDropdown();
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    if (mentionState.items.length > 0) {
+      e.preventDefault();
+      selectMention(mentionState.items[mentionState.highlight]);
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeMentionDropdown();
+  }
+}
+
+async function openMentionDropdown(ta) {
+  if (playersCatalog.length === 0) await loadPlayersCatalog();
+  const q = mentionState.query.toLowerCase();
+  mentionState.items = playersCatalog
+    .filter(p => !q
+      ? true
+      : (p.full_name || '').toLowerCase().includes(q) ||
+        (p.nickname  || '').toLowerCase().includes(q))
+    .slice(0, 8);
+  positionMentionDropdown(ta);
+  renderMentionDropdown();
+}
+
+function positionMentionDropdown(ta) {
+  if (!ta) return;
+  const dd   = document.getElementById('mention-dropdown');
+  const rect = ta.getBoundingClientRect();
+  dd.style.left  = (rect.left + window.scrollX) + 'px';
+  dd.style.top   = (rect.bottom + window.scrollY + 4) + 'px';
+  dd.style.width = Math.max(rect.width, 260) + 'px';
+}
+
+function renderMentionDropdown() {
+  const dd = document.getElementById('mention-dropdown');
+  if (mentionState.items.length === 0) {
+    dd.innerHTML = '<div class="search-empty">Sin jugadores que coincidan</div>';
+  } else {
+    dd.innerHTML = mentionState.items.map((p, i) => `
+      <div class="mention-item ${i === mentionState.highlight ? 'highlight' : ''}" data-idx="${i}">
+        <div class="mention-avatar">${p.photo_url ? `<img src="${escapeAttr(p.photo_url)}">` : initialsOf(p.full_name)}</div>
+        <div>
+          <div class="mention-name">${escapeHtml(p.full_name)}${p.nickname ? ` <span class="mention-sub">"${escapeHtml(p.nickname)}"</span>` : ''}</div>
+          <div class="mention-sub">${p.nationality_iso || '—'}${p.vpt_ranking ? ` · #${p.vpt_ranking} VPT` : ''}</div>
+        </div>
+      </div>
+    `).join('');
+    dd.querySelectorAll('.mention-item').forEach(el => {
+      // mousedown para ganar la carrera con el blur del textarea
+      el.onmousedown = (ev) => {
+        ev.preventDefault();
+        const idx = parseInt(el.dataset.idx, 10);
+        selectMention(mentionState.items[idx]);
+      };
+    });
+  }
+  dd.classList.add('show');
+}
+
+function selectMention(player) {
+  if (!player) return;
+  const ta   = mentionState.textarea;
+  const text = ta.value;
+  const pos  = ta.selectionStart;
+  const before = text.slice(0, mentionState.anchor);
+  const after  = text.slice(pos);
+  const token  = `@[${player.full_name}](${player.id})`;
+  ta.value = before + token + ' ' + after;
+  const newPos = (before + token + ' ').length;
+  ta.selectionStart = ta.selectionEnd = newPos;
+  closeMentionDropdown();
+  ta.focus();
+}
+
+function closeMentionDropdown() {
+  mentionState.active = false;
+  const dd = document.getElementById('mention-dropdown');
+  if (dd) dd.classList.remove('show');
+}
+
+// ── MENTIONS: persistencia en update_mentions ────────────────
+function extractMentionedPlayerIds(text) {
+  if (!text) return [];
+  const re = /@\[[^\]]+\]\(([0-9a-fA-F-]{36})\)/g;
+  const ids = new Set();
+  let m;
+  while ((m = re.exec(text))) ids.add(m[1]);
+  return [...ids];
+}
+
+async function syncMentionsForUpdate(updateId, body) {
+  // DELETE + INSERT (funciona tanto en alta como en edición futura)
+  await sb.from('update_mentions').delete().eq('update_id', updateId);
+  const ids = extractMentionedPlayerIds(body);
+  if (ids.length === 0) return;
+  const rows = ids.map(pid => ({ update_id: updateId, player_id: pid }));
+  const { error } = await sb.from('update_mentions').insert(rows);
+  if (error) console.warn('insert update_mentions', error);
+}
+
+// Render body del feed con menciones como chip dorado.
+// Dos pasadas: busca menciones en el body CRUDO (mismo patrón que usa
+// extractMentionedPlayerIds, así ambos se comportan igual), y escapa los
+// segmentos de texto normal alrededor. Evita cualquier interacción rara
+// entre escapeHtml y el regex, y mantiene XSS cubierto.
+function renderBodyWithMentions(body) {
+  if (!body) return '';
+  const re = /@\[([^\]]+)\]\(([0-9a-fA-F-]{36})\)/g;
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    if (m.index > last) out += escapeHtml(body.slice(last, m.index));
+    out += `<span class="mention-chip">@${escapeHtml(m[1])}</span>`;
+    last = m.index + m[0].length;
+  }
+  if (last < body.length) out += escapeHtml(body.slice(last));
+  return out;
+}
+
+// ── HELPERS COMPARTIDOS ──────────────────────────────────────
+function formatChips(n) {
+  if (n === null || n === undefined) return '—';
+  if (Math.abs(n) >= 1000000) {
+    return (n / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+  }
+  return new Intl.NumberFormat('es-ES').format(n);
+}
+function initialsOf(name) {
+  if (!name) return '—';
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
 
 // ── CHECK SESSION ─────────────────────────────────────────────
 (async () => {
@@ -1130,6 +2533,13 @@ function setFilter(filter, btn) {
 // Enter en login
 document.getElementById('login-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') login();
+});
+
+// Escape cierra modales abiertos (ahora mismo, modal de edición de jugador)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('player-edit-modal');
+  if (modal && modal.style.display !== 'none') closePlayerEditModal();
 });
 </script>
 </body>
