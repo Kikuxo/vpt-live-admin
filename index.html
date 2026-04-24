@@ -1013,6 +1013,137 @@
     margin-top: 4px;
   }
 
+  /* ── CHIP COUNTS en el formulario ─────────────────────────── */
+  .chipcounts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chipcounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .chipcount-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 130px 28px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    animation: slideIn .2s ease;
+  }
+  .chipcount-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .chipcount-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .chipcount-name {
+    font-size: 12px;
+    color: var(--white);
+    font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .chipcount-input {
+    padding: 6px 8px !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 12px !important;
+    text-align: right;
+  }
+  .chipcount-remove {
+    width: 26px; height: 26px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  .chipcount-remove:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── CHIP COUNTS renderizados en el feed ──────────────────── */
+  .post-chipcounts {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .post-chipcounts-header {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .post-chipcounts-row {
+    display: grid;
+    grid-template-columns: 32px 28px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .post-chipcounts-row:last-child { border-bottom: none; }
+  .post-chipcounts-pos {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: center;
+  }
+  .post-chipcounts-pos.medal {
+    font-size: 16px;
+    font-family: inherit;
+  }
+  .post-chipcounts-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .post-chipcounts-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .post-chipcounts-name {
+    font-size: 12px;
+    color: var(--white);
+    font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; gap: 6px;
+    min-width: 0;
+  }
+  .post-chipcounts-chips {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .post-chipcounts-missing {
+    font-style: italic;
+    color: var(--muted);
+  }
+
   /* Render chip de mención dentro de posts del feed */
   .mention-chip {
     display: inline-block;
@@ -1109,21 +1240,17 @@
 
       <div class="divider"></div>
 
-      <!-- Título y Cuerpo -->
-      <div class="select-group">
-        <input type="text" id="input-title" placeholder="Título del post" />
-        <textarea id="input-body" placeholder="Descripción, contexto, detalles..." rows="4"></textarea>
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- Info Box -->
+      <!-- Info Box (contextuales del nivel: encima del título para flujo rápido) -->
       <div class="info-box">
         <div class="info-box-title">📊 Datos del momento (opcional)</div>
         <div class="info-grid">
           <div class="info-field">
             <label>NIVEL</label>
             <input type="text" id="extra-nivel" placeholder="ej. 12" />
+          </div>
+          <div class="info-field">
+            <label>CIEGAS</label>
+            <input type="text" id="extra-ciegas" placeholder="ej. 1.000/2.000" />
           </div>
           <div class="info-field">
             <label>JUGADORES</label>
@@ -1133,10 +1260,28 @@
             <label>MEDIA</label>
             <input type="text" id="extra-media" placeholder="ej. 48.000" />
           </div>
-          <div class="info-field">
-            <label>NIVEL</label>
-            <input type="text" id="extra-blinds" placeholder="ej. 1.000/2.000" />
-          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Título y Cuerpo -->
+      <div class="select-group">
+        <input type="text" id="input-title" placeholder="Título del post" />
+        <textarea id="input-body" placeholder="Descripción, contexto, detalles..." rows="4"></textarea>
+      </div>
+
+      <!-- Chip counts destacados (adjuntables a cualquier categoría) -->
+      <div id="chipcounts-section" class="chipcounts-section">
+        <div class="divider"></div>
+        <div class="panel-title">🎯 Chip counts a destacar</div>
+        <div style="position:relative;">
+          <input type="text" id="cc-search" placeholder="Añadir jugador..." autocomplete="off" />
+          <div id="cc-search-results" class="search-results"></div>
+        </div>
+        <div id="cc-list" class="chipcounts-list"></div>
+        <div id="cc-hint" style="font-size:11px;color:var(--muted);line-height:1.4;">
+          Admite <code style="font-family:'DM Mono',monospace;">450k</code>, <code style="font-family:'DM Mono',monospace;">450.000</code>, <code style="font-family:'DM Mono',monospace;">1.5M</code>. Se ordenan automáticamente.
         </div>
       </div>
 
@@ -1327,6 +1472,8 @@ let allPosts = [];
 let festivals = [];
 let refreshInterval = null;
 let editingPostId = null;  // null = modo nuevo; UUID = modo edición
+let currentChipcounts = [];  // [{ player_id, chip_count }] para la sección Chip Count
+const CHIPCOUNTS_SOFT_LIMIT = 9;  // aviso al añadir el 10º, no bloqueo duro
 
 // ── INIT CATEGORÍAS ───────────────────────────────────────────
 function initCats() {
@@ -1488,6 +1635,8 @@ function showApp(user, adminName) {
   loadPlayersCatalog();
   setupMentionAutocomplete();
   initPlayerSearchForm();
+  initChipcountsPicker();
+  restoreStickyToForm();  // Mejora 3: repoblar Torneo/Nivel/Ciegas/Jugadores/Media desde localStorage
   // Refresco automático cada 15 segundos
   refreshInterval = setInterval(loadPosts, 15000);
 }
@@ -1576,22 +1725,63 @@ function buildPostCard(post) {
       <button class="post-delete" onclick="deletePost('${post.id}', this)" title="Eliminar">✕</button>
     </div>
     <div class="post-body">
-      ${post.title ? `<div class="post-title-text">${escapeHtml(post.title)}</div>` : ''}
-      ${post.body ? `<div class="post-body-text">${renderBodyWithMentions(post.body)}</div>` : ''}
-      ${extra && Object.keys(extra).length > 0 ? `
-        <div class="post-extra">
-          ${extra.Nivel     ? `<div class="extra-stat"><div class="extra-label">Nivel</div><div class="extra-value">${extra.Nivel}</div></div>` : ''}
-          ${extra.Jugadores ? `<div class="extra-stat"><div class="extra-label">Jugadores</div><div class="extra-value">${extra.Jugadores}</div></div>` : ''}
-          ${extra.Media     ? `<div class="extra-stat"><div class="extra-label">Media</div><div class="extra-value">${extra.Media}</div></div>` : ''}
-          ${extra.Blinds    ? `<div class="extra-stat"><div class="extra-label">Blinds</div><div class="extra-value">${extra.Blinds}</div></div>` : ''}
-          ${extra.Torneo    ? `<div class="extra-stat"><div class="extra-label">Torneo</div><div class="extra-value">${extra.Torneo}</div></div>` : ''}
-        </div>` : ''}
+      ${post.title ? `<div class="post-title-text">${renderFlags(escapeHtml(post.title))}</div>` : ''}
+      ${post.body ? `<div class="post-body-text">${renderFlags(renderBodyWithMentions(post.body))}</div>` : ''}
+      ${extra && Object.keys(extra).length > 0 ? (() => {
+        // Orden fijo: Torneo → Nivel → Ciegas → Jugadores → Media
+        // extra.Ciegas con fallback a extra.Blinds por posts antiguos aún no migrados
+        const ciegasVal = extra.Ciegas ?? extra.Blinds;
+        const parts = [
+          extra.Torneo    ? `<div class="extra-stat"><div class="extra-label">Torneo</div><div class="extra-value">${extra.Torneo}</div></div>` : '',
+          extra.Nivel     ? `<div class="extra-stat"><div class="extra-label">Nivel</div><div class="extra-value">${extra.Nivel}</div></div>`   : '',
+          ciegasVal       ? `<div class="extra-stat"><div class="extra-label">Ciegas</div><div class="extra-value">${ciegasVal}</div></div>`    : '',
+          extra.Jugadores ? `<div class="extra-stat"><div class="extra-label">Jugadores</div><div class="extra-value">${extra.Jugadores}</div></div>` : '',
+          extra.Media     ? `<div class="extra-stat"><div class="extra-label">Media</div><div class="extra-value">${extra.Media}</div></div>`   : '',
+        ].filter(Boolean);
+        return parts.length ? `<div class="post-extra">${parts.join('')}</div>` : '';
+      })() : ''}
     </div>
+    ${renderPostChipcounts(post)}
     ${post.image_url ? `
       <div class="post-image">
         <img src="${escapeAttr(post.image_url)}" alt="" loading="lazy">
       </div>` : ''}`;
   return card;
+}
+
+// Renderiza el bloque de chip counts destacados del post (si los tiene).
+// Reusa playersCatalog en memoria para nombre/foto/bandera. Si el jugador
+// fue borrado del catálogo, muestra un placeholder muted.
+function renderPostChipcounts(post) {
+  const list = Array.isArray(post.extra?.chipcounts) ? post.extra.chipcounts : [];
+  if (list.length === 0) return '';
+  const sorted = [...list].sort((a, b) => (b.chip_count || 0) - (a.chip_count || 0));
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  const rows = sorted.map((c, i) => {
+    const pos = i + 1;
+    const medal = pos <= 3 ? MEDALS[pos - 1] : null;
+    const p = playersCatalog.find(x => x.id === c.player_id);
+    const name = p?.full_name;
+    const avatar = p?.photo_url
+      ? `<img src="${escapeAttr(p.photo_url)}" alt="">`
+      : initialsOf(p?.full_name || '?');
+    const flag = p?.nationality_iso ? `<span class="player-flag">${p.nationality_iso}</span>` : '';
+    const nameHtml = name
+      ? `${escapeHtml(name)} ${flag}`
+      : `<span class="post-chipcounts-missing">jugador eliminado</span>`;
+    return `
+      <div class="post-chipcounts-row">
+        <div class="post-chipcounts-pos ${medal ? 'medal' : ''}">${medal || '#' + pos}</div>
+        <div class="post-chipcounts-avatar">${avatar}</div>
+        <div class="post-chipcounts-name">${nameHtml}</div>
+        <div class="post-chipcounts-chips">${formatChips(c.chip_count || 0)}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="post-chipcounts">
+      <div class="post-chipcounts-header">Chip counts</div>
+      ${rows}
+    </div>`;
 }
 
 // ── PUBLICAR ──────────────────────────────────────────────────
@@ -1601,9 +1791,9 @@ async function publishPost() {
   const title      = document.getElementById('input-title').value.trim();
   const body       = document.getElementById('input-body').value.trim();
   const nivel      = document.getElementById('extra-nivel').value.trim();
+  const ciegas     = document.getElementById('extra-ciegas').value.trim();
   const players    = document.getElementById('extra-players').value.trim();
   const media      = document.getElementById('extra-media').value.trim();
-  const blinds     = document.getElementById('extra-blinds').value.trim();
 
   // Validaciones
   if (!festivalId) return showFeedback('Selecciona un festival primero', 'err');
@@ -1617,13 +1807,56 @@ async function publishPost() {
     type = customCat || 'update';
   }
 
-  // Extra data
+  // Extra data — orden de escritura no es crítico (jsonb no garantiza orden),
+  // pero sí el orden de RENDER en buildPostCard: Torneo → Nivel → Ciegas → Jugadores → Media
   const extra = {};
-  if (tournament) extra['Torneo'] = tournament;
-  if (nivel)    extra['Nivel'] = nivel;
-  if (players)  extra['Jugadores'] = players;
-  if (media)    extra['Media'] = media;
-  if (blinds)   extra['Blinds'] = blinds;
+  if (tournament) extra['Torneo']    = tournament;
+  if (nivel)      extra['Nivel']     = nivel;
+  if (ciegas)     extra['Ciegas']    = ciegas;
+  if (players)    extra['Jugadores'] = players;
+  if (media)      extra['Media']     = media;
+
+  // Chip counts destacados — adjuntables a cualquier categoría si hay ≥1 jugador
+  if (currentChipcounts.length > 0) {
+    extra['chipcounts'] = [...currentChipcounts]
+      .sort((a, b) => (b.chip_count || 0) - (a.chip_count || 0))
+      .map(c => ({ player_id: c.player_id, chip_count: c.chip_count || 0 }));
+  }
+
+  // Antes de publicar: si hay chipcounts con jugadores que NO están en el
+  // leaderboard del festival, ofrecer añadirlos con un confirm.
+  if (currentChipcounts.length > 0) {
+    try {
+      const ids = currentChipcounts.map(c => c.player_id);
+      const { data: existing } = await sb.from('festival_players')
+        .select('player_id')
+        .eq('festival_id', festivalId)
+        .in('player_id', ids);
+      const existingSet = new Set((existing || []).map(x => x.player_id));
+      const missing = currentChipcounts.filter(c => !existingSet.has(c.player_id));
+      if (missing.length > 0) {
+        const names = missing.map(m => {
+          const p = playersCatalog.find(x => x.id === m.player_id);
+          return `• ${p?.full_name || m.player_id} — ${formatChips(m.chip_count || 0)}`;
+        }).join('\n');
+        const add = confirm(
+          `Estos jugadores del bloque no están en el leaderboard del festival:\n\n${names}\n\n` +
+          `¿Añadirlos también al leaderboard con estas fichas?`
+        );
+        if (add) {
+          const rows = missing.map(m => ({
+            festival_id: festivalId,
+            player_id:   m.player_id,
+            chip_count:  m.chip_count || 0,
+          }));
+          const { error: fpErr } = await sb.from('festival_players').insert(rows);
+          if (fpErr) console.warn('festival_players bulk insert', fpErr);
+        }
+      }
+    } catch (e) {
+      console.warn('check festival_players presence', e);
+    }
+  }
 
   const btn = document.getElementById('publish-btn');
   const editing = !!editingPostId;
@@ -1677,28 +1910,34 @@ async function publishPost() {
     catch (e) { console.warn('syncMentions failed', e); }
   }
 
+  // Guardar sticky antes de limpiar/salir; restaurar después (en edición,
+  // exitEditMode deja el formulario vacío y hay que repoblar los 5 campos).
+  saveStickyFromForm();
+
   if (editing) {
     showFeedback('✓ Post actualizado', 'ok');
     exitEditMode();
+    restoreStickyToForm();
   } else {
     showFeedback('✓ Publicado correctamente', 'ok');
     clearForm();
+    // clearForm ya NO limpia los 5 sticky — no hace falta restaurar aquí
   }
   loadPosts();
 }
 
 function clearForm() {
+  // Se llama tras publicar correctamente un post NUEVO (en edición usamos exitEditMode).
+  // Sticky fields (Torneo/Nivel/Ciegas/Jugadores/Media) NO se limpian — persisten
+  // para que el admin no tenga que reescribirlos en el siguiente post.
   document.getElementById('input-title').value = '';
   document.getElementById('input-body').value = '';
-  document.getElementById('extra-nivel').value = '';
-  document.getElementById('extra-players').value = '';
-  document.getElementById('extra-media').value = '';
-  document.getElementById('extra-blinds').value = '';
   document.getElementById('input-flickr-url').value = '';
   document.getElementById('flickr-preview').style.display = 'none';
   const resolvedEl = document.getElementById('flickr-resolved-url');
   if (resolvedEl) resolvedEl.value = '';
-  // No limpiar festival ni torneo ni categoría — es probable que se siga usando
+  // Chipcounts son snapshot del momento — NO son sticky
+  clearChipcounts();
 }
 
 function showFeedback(msg, type) {
@@ -1727,9 +1966,9 @@ function enterEditMode(postId) {
   document.getElementById('input-title').value      = post.title || '';
   document.getElementById('input-body').value       = post.body || '';
   document.getElementById('extra-nivel').value      = post.extra?.Nivel     || '';
+  document.getElementById('extra-ciegas').value     = post.extra?.Ciegas ?? post.extra?.Blinds ?? '';
   document.getElementById('extra-players').value    = post.extra?.Jugadores || '';
   document.getElementById('extra-media').value      = post.extra?.Media     || '';
-  document.getElementById('extra-blinds').value     = post.extra?.Blinds    || '';
 
   // Categoría: si existe en el array la selecciono, si no es "other" con el texto custom
   const catExists = CATEGORIES.some(c => c.id === post.type);
@@ -1740,6 +1979,14 @@ function enterEditMode(postId) {
     selectCat('other');
     document.getElementById('cat-extra-input').value = post.type || '';
   }
+
+  // Chip counts destacados (solo si la categoría era chipcount y hay datos)
+  const cc = Array.isArray(post.extra?.chipcounts) ? post.extra.chipcounts : [];
+  currentChipcounts = cc.map(c => ({
+    player_id:  c.player_id,
+    chip_count: Number(c.chip_count) || 0,
+  }));
+  renderChipcountsList();
 
   // Imagen
   const flickrInput = document.getElementById('input-flickr-url');
@@ -1784,9 +2031,9 @@ function exitEditMode() {
   document.getElementById('input-body').value       = '';
   document.getElementById('input-tournament').value = '';
   document.getElementById('extra-nivel').value      = '';
+  document.getElementById('extra-ciegas').value     = '';
   document.getElementById('extra-players').value    = '';
   document.getElementById('extra-media').value      = '';
-  document.getElementById('extra-blinds').value     = '';
   document.getElementById('input-flickr-url').value = '';
   document.getElementById('flickr-preview').style.display = 'none';
   const resolved = document.getElementById('flickr-resolved-url');
@@ -1802,6 +2049,9 @@ function exitEditMode() {
     b.style.color       = 'var(--muted)';
   });
   document.getElementById('cat-extra-wrap').classList.remove('show');
+
+  // Limpiar estado de chip counts (la sección queda visible, solo vacía)
+  clearChipcounts();
 
   // UI
   document.getElementById('edit-indicator').style.display = 'none';
@@ -2474,6 +2724,21 @@ async function syncMentionsForUpdate(updateId, body) {
   if (error) console.warn('insert update_mentions', error);
 }
 
+// Sustituye :XX: (2 letras mayúsculas entre dos dos-puntos) por la bandera
+// emoji correspondiente. Usa regional indicator symbols (U+1F1E6..U+1F1FF).
+// Aplicación a display only: la DB guarda el texto literal ":ES:".
+// El patrón estricto /:([A-Z]{2}):/ no colisiona con UUIDs (hex lowercase),
+// URLs típicas, ni el interior de @[Nombre](uuid) del render de menciones.
+function renderFlags(text) {
+  if (!text) return text;
+  const A_INDICATOR = 0x1F1E6;
+  const A_CODE = 'A'.charCodeAt(0);
+  return text.replace(/:([A-Z]{2}):/g, (_, cc) => {
+    return String.fromCodePoint(A_INDICATOR + cc.charCodeAt(0) - A_CODE) +
+           String.fromCodePoint(A_INDICATOR + cc.charCodeAt(1) - A_CODE);
+  });
+}
+
 // Render body del feed con menciones como chip dorado.
 // Dos pasadas: busca menciones en el body CRUDO (mismo patrón que usa
 // extractMentionedPlayerIds, así ambos se comportan igual), y escapa los
@@ -2492,6 +2757,195 @@ function renderBodyWithMentions(body) {
   }
   if (last < body.length) out += escapeHtml(body.slice(last));
   return out;
+}
+
+// ── STICKY FIELDS (localStorage) ─────────────────────────────
+const STICKY_KEY = 'vpt_admin_sticky_fields_v1';
+
+function saveStickyFromForm() {
+  const data = {
+    Torneo:    document.getElementById('input-tournament').value || '',
+    Nivel:     document.getElementById('extra-nivel').value      || '',
+    Ciegas:    document.getElementById('extra-ciegas').value     || '',
+    Jugadores: document.getElementById('extra-players').value    || '',
+    Media:     document.getElementById('extra-media').value      || '',
+  };
+  try { localStorage.setItem(STICKY_KEY, JSON.stringify(data)); }
+  catch (e) { /* quota/blocked — sticky no se persistirá, no fatal */ }
+}
+
+function restoreStickyToForm() {
+  let data = {};
+  try { data = JSON.parse(localStorage.getItem(STICKY_KEY) || '{}'); }
+  catch (e) { data = {}; }
+  document.getElementById('input-tournament').value = data.Torneo    || '';
+  document.getElementById('extra-nivel').value      = data.Nivel     || '';
+  document.getElementById('extra-ciegas').value     = data.Ciegas    || '';
+  document.getElementById('extra-players').value    = data.Jugadores || '';
+  document.getElementById('extra-media').value      = data.Media     || '';
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  CHIP COUNTS destacados en posts (categoría 'chipcount')     ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// Acepta "450k", "450.000", "450000", "1.5M". Con sufijo k/m/b los
+// separadores se interpretan como decimal (1,5k → 1500). Sin sufijo,
+// los puntos/comas son separadores de miles (450.000 → 450000).
+function parseChipInput(raw) {
+  if (raw === null || raw === undefined) return NaN;
+  let s = String(raw).trim().toLowerCase().replace(/\s+/g, '');
+  if (!s) return NaN;
+  if (/[kmb]$/.test(s)) {
+    const suffix = s.slice(-1);
+    s = s.slice(0, -1).replace(',', '.');   // coma decimal europea → punto
+    const mult = suffix === 'k' ? 1000 : suffix === 'm' ? 1_000_000 : 1_000_000_000;
+    const n = parseFloat(s);
+    return isFinite(n) ? Math.round(n * mult) : NaN;
+  }
+  s = s.replace(/[.,]/g, '');  // separadores de miles → fuera
+  const n = parseInt(s, 10);
+  return isFinite(n) ? n : NaN;
+}
+
+function initChipcountsPicker() {
+  const input   = document.getElementById('cc-search');
+  const results = document.getElementById('cc-search-results');
+  if (!input || !results) return;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { results.classList.remove('show'); results.innerHTML = ''; return; }
+    const chosen = new Set(currentChipcounts.map(c => c.player_id));
+    const matches = playersCatalog
+      .filter(p =>
+        !chosen.has(p.id) && (
+          (p.full_name || '').toLowerCase().includes(q) ||
+          (p.nickname  || '').toLowerCase().includes(q)
+        )
+      )
+      .slice(0, 8);
+
+    if (matches.length === 0) {
+      results.innerHTML = '<div class="search-empty">Sin resultados</div>';
+    } else {
+      results.innerHTML = matches.map(p => `
+        <div class="search-result" data-id="${p.id}">
+          <div class="mention-avatar">${p.photo_url ? `<img src="${escapeAttr(p.photo_url)}">` : initialsOf(p.full_name)}</div>
+          <div>
+            <div class="search-result-name">${escapeHtml(p.full_name)}${p.nickname ? ` <span class="search-result-sub">"${escapeHtml(p.nickname)}"</span>` : ''}</div>
+            <div class="search-result-sub">${p.nationality_iso || '—'}${p.vpt_ranking ? ` · #${p.vpt_ranking} VPT` : ''}</div>
+          </div>
+        </div>
+      `).join('');
+      results.querySelectorAll('.search-result').forEach(el => {
+        el.onclick = () => addChipcountPlayer(el.dataset.id);
+      });
+    }
+    results.classList.add('show');
+  });
+
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+      results.classList.remove('show');
+    }
+  });
+}
+
+function addChipcountPlayer(playerId) {
+  if (currentChipcounts.some(c => c.player_id === playerId)) return;
+
+  // Soft limit: aviso al añadir el 10º (≥9 ya presentes → este sería el 10º)
+  if (currentChipcounts.length >= CHIPCOUNTS_SOFT_LIMIT) {
+    const ok = confirm(
+      `Ya has añadido ${CHIPCOUNTS_SOFT_LIMIT} jugadores al bloque. ` +
+      `¿Quieres seguir añadiendo más? (Puede quedar denso visualmente en el post)`
+    );
+    if (!ok) return;
+  }
+
+  const player = playersCatalog.find(p => p.id === playerId);
+  if (!player) return;
+
+  // Pre-rellenar con chip_count del leaderboard del festival si está ahí
+  const fp = festivalPlayers.find(r => r.player_id === playerId);
+  const initial = fp ? (fp.chip_count ?? 0) : 0;
+
+  currentChipcounts.push({ player_id: playerId, chip_count: initial });
+  renderChipcountsList();
+
+  // Limpiar buscador
+  const input   = document.getElementById('cc-search');
+  const results = document.getElementById('cc-search-results');
+  if (input)   input.value = '';
+  if (results) { results.classList.remove('show'); results.innerHTML = ''; }
+}
+
+function removeChipcountPlayer(playerId) {
+  currentChipcounts = currentChipcounts.filter(c => c.player_id !== playerId);
+  renderChipcountsList();
+}
+
+function updateChipcountValue(playerId, rawValue) {
+  const parsed = parseChipInput(rawValue);
+  if (!isFinite(parsed)) return;  // input inválido; lo deja como estaba en el array
+  const row = currentChipcounts.find(c => c.player_id === playerId);
+  if (!row) return;
+  row.chip_count = parsed;
+  // Re-render para que se reordene desc y se normalice el formato mostrado
+  renderChipcountsList();
+}
+
+function renderChipcountsList() {
+  const list = document.getElementById('cc-list');
+  if (!list) return;
+
+  // Orden descendente
+  currentChipcounts.sort((a, b) => (b.chip_count || 0) - (a.chip_count || 0));
+
+  if (currentChipcounts.length === 0) {
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = currentChipcounts.map(c => {
+    const p = playersCatalog.find(x => x.id === c.player_id);
+    const name   = p?.full_name || '(jugador eliminado)';
+    const avatar = p?.photo_url
+      ? `<img src="${escapeAttr(p.photo_url)}" alt="">`
+      : initialsOf(p?.full_name || '?');
+    const flag = p?.nationality_iso ? `<span class="player-flag">${p.nationality_iso}</span>` : '';
+    return `
+      <div class="chipcount-row" data-id="${c.player_id}">
+        <div class="chipcount-avatar">${avatar}</div>
+        <div class="chipcount-name">${escapeHtml(name)} ${flag}</div>
+        <input class="chipcount-input" type="text" value="${formatChips(c.chip_count)}"
+               data-id="${c.player_id}" />
+        <button class="chipcount-remove" title="Quitar" data-id="${c.player_id}">✕</button>
+      </div>`;
+  }).join('');
+
+  // Bind eventos — onblur/enter para actualizar, click para quitar
+  list.querySelectorAll('.chipcount-input').forEach(inp => {
+    const id = inp.dataset.id;
+    inp.onblur = () => updateChipcountValue(id, inp.value);
+    inp.onkeydown = (e) => {
+      if (e.key === 'Enter')      { e.preventDefault(); inp.blur(); }
+      else if (e.key === 'Escape') { const row = currentChipcounts.find(c => c.player_id === id); if (row) inp.value = formatChips(row.chip_count); inp.blur(); }
+    };
+  });
+  list.querySelectorAll('.chipcount-remove').forEach(btn => {
+    btn.onclick = () => removeChipcountPlayer(btn.dataset.id);
+  });
+}
+
+function clearChipcounts() {
+  currentChipcounts = [];
+  const input   = document.getElementById('cc-search');
+  const results = document.getElementById('cc-search-results');
+  if (input)   input.value = '';
+  if (results) { results.classList.remove('show'); results.innerHTML = ''; }
+  renderChipcountsList();
 }
 
 // ── HELPERS COMPARTIDOS ──────────────────────────────────────
