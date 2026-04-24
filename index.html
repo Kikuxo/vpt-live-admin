@@ -1166,6 +1166,137 @@
   .badge-color-swatch:hover { transform: scale(1.1); }
   .badge-color-swatch.selected { border-color: var(--white); }
 
+  /* ── VÍDEOS DEL FESTIVAL ──────────────────────────────────── */
+  .videos-section { display: flex; flex-direction: column; gap: 6px; }
+  .videos-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+  }
+  .videos-header:hover { color: var(--white); }
+  .videos-toggle {
+    font-size: 9px;
+    color: var(--gold);
+    transition: transform .15s ease;
+    display: inline-block;
+    width: 10px;
+  }
+  .videos-section.expanded .videos-toggle { transform: rotate(90deg); }
+  .videos-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--white);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .videos-count {
+    color: var(--muted);
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+  }
+  .videos-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .videos-no-festival {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 6px 0;
+  }
+  .videos-form { display: flex; flex-direction: column; gap: 8px; }
+  .video-preview {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .video-preview img {
+    width: 96px; height: 54px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+  }
+  .video-preview-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+  .video-preview-title {
+    font-size: 12px;
+    color: var(--white);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .videos-list { display: flex; flex-direction: column; gap: 6px; }
+  .videos-empty {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 6px 0;
+    text-align: center;
+  }
+  .video-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 28px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .video-row img {
+    width: 80px; height: 45px;
+    border-radius: 3px;
+    object-fit: cover;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+  }
+  .video-row a {
+    font-size: 11px;
+    color: var(--white);
+    text-decoration: none;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .video-row a:hover { color: var(--gold); }
+  .video-remove {
+    width: 24px; height: 24px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .video-remove:hover {
+    color: #e05252;
+    border-color: #e05252;
+  }
+
   /* ── CHIP COUNTS en el formulario ─────────────────────────── */
   .chipcounts-section {
     display: flex;
@@ -1455,6 +1586,38 @@
         Cancelar edición
       </button>
       <div class="publish-feedback" id="pub-feedback"></div>
+
+      <div class="divider"></div>
+
+      <!-- Vídeos del festival (colapsable) -->
+      <div class="videos-section" id="videos-section">
+        <div class="videos-header" onclick="toggleVideosSection()">
+          <span class="videos-toggle" id="videos-toggle">▶</span>
+          <span class="videos-title">Vídeos del festival</span>
+          <span class="videos-count" id="videos-count">(0)</span>
+        </div>
+        <div class="videos-body" id="videos-body" style="display:none;">
+          <div class="videos-no-festival" id="videos-no-festival" style="display:none;">
+            Selecciona un festival primero
+          </div>
+          <div class="videos-form" id="videos-form">
+            <input type="text" id="video-url-input"
+                   placeholder="Pega URL de YouTube..."
+                   onblur="previewYouTubeUrl()" autocomplete="off" />
+            <div id="video-preview" class="video-preview" style="display:none;">
+              <img id="video-preview-thumb" src="" alt="" />
+              <div class="video-preview-info">
+                <div id="video-preview-title" class="video-preview-title"></div>
+                <button class="btn-primary" onclick="addFestivalVideo()" style="align-self:flex-start;">
+                  + Añadir al festival
+                </button>
+              </div>
+            </div>
+            <div class="publish-feedback" id="video-form-status" style="display:none;"></div>
+          </div>
+          <div id="videos-list" class="videos-list"></div>
+        </div>
+      </div>
     </div>
 
     <!-- PANEL DERECHO: Feed -->
@@ -1861,7 +2024,13 @@ function showApp(user, adminName) {
   document.getElementById('user-email-display').textContent = adminName ? adminName + ' · ' + user.email : user.email;
 
   initCats();
-  loadFestivals().then(() => syncPlayersFestivalIndicator());
+  loadFestivals().then(() => {
+    syncPlayersFestivalIndicator();
+    // Vídeos: contador siempre visible (sección colapsada por defecto).
+    // El subscribe vive aquí porque la vista Feed es la activa al login.
+    loadFestivalVideos();
+    subscribeFestivalVideosRealtime();
+  });
   loadPosts();
   loadPlayersCatalog();
   // Badges se cargan también al login: se usan en render del feed (chipcounts)
@@ -1899,6 +2068,10 @@ function onFestivalChange() {
     loadFestivalPlayers();
     subscribeFestivalPlayersRealtime();
   }
+  // Vídeos: siempre re-suscribir + recargar al cambiar de festival.
+  // Si la sección está colapsada, el contador igual se actualiza.
+  loadFestivalVideos();
+  subscribeFestivalVideosRealtime();
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -3459,6 +3632,195 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 function escapeAttr(s) { return escapeHtml(s); }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  VÍDEOS DEL FESTIVAL                                         ║
+// ╚══════════════════════════════════════════════════════════════╝
+//
+// Sólo YouTube por ahora. Reusa la API pública oEmbed
+// (https://www.youtube.com/oembed?url=...&format=json) para extraer
+// title + thumbnail sin necesidad de API key.
+
+let festivalVideos = [];           // cache del festival activo
+let videosCollapsed = true;        // sección colapsada por defecto
+let videosRealtimeChannel = null;
+let videoPreviewData = null;       // datos resueltos pendientes de añadir
+
+// Soporta watch?v=, youtu.be/, embed/ y shorts/. youtube_id es 11 chars.
+function extractYouTubeId(url) {
+  if (!url) return null;
+  const patterns = [
+    /[?&]v=([a-zA-Z0-9_-]{11})/,
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const re of patterns) {
+    const m = url.match(re);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function showVideoFeedback(msg, type) {
+  const el = document.getElementById('video-form-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + (type || '');
+  el.style.display = 'block';
+  if (type === 'ok') setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+function toggleVideosSection() {
+  const section = document.getElementById('videos-section');
+  const body    = document.getElementById('videos-body');
+  videosCollapsed = !videosCollapsed;
+  if (videosCollapsed) {
+    body.style.display = 'none';
+    section.classList.remove('expanded');
+  } else {
+    body.style.display = 'flex';
+    section.classList.add('expanded');
+    // Recarga al expandir por si el festival cambió mientras estaba cerrada
+    loadFestivalVideos();
+  }
+}
+
+async function previewYouTubeUrl() {
+  const inputEl = document.getElementById('video-url-input');
+  const preview = document.getElementById('video-preview');
+  const url = inputEl.value.trim();
+  videoPreviewData = null;
+  preview.style.display = 'none';
+  document.getElementById('video-form-status').style.display = 'none';
+  if (!url) return;
+
+  const youtube_id = extractYouTubeId(url);
+  if (!youtube_id) {
+    showVideoFeedback('⚠️ URL no reconocida (debe ser de YouTube)', 'err');
+    return;
+  }
+
+  showVideoFeedback('⏳ Cargando metadatos...', '');
+  try {
+    const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const r = await fetch(oembed);
+    if (!r.ok) throw new Error('oEmbed HTTP ' + r.status);
+    const data = await r.json();
+    // Fallback al thumbnail estándar de YouTube si oEmbed no lo trae.
+    const thumb = data.thumbnail_url || `https://img.youtube.com/vi/${youtube_id}/hqdefault.jpg`;
+    videoPreviewData = { youtube_id, url, title: data.title || '(sin título)', thumbnail_url: thumb };
+    document.getElementById('video-preview-thumb').src = thumb;
+    document.getElementById('video-preview-title').textContent = videoPreviewData.title;
+    preview.style.display = 'flex';
+    document.getElementById('video-form-status').style.display = 'none';
+  } catch(e) {
+    showVideoFeedback('❌ No se pudo leer metadatos: ' + e.message, 'err');
+  }
+}
+
+async function addFestivalVideo() {
+  if (!videoPreviewData) return;
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return showVideoFeedback('Selecciona un festival primero', 'err');
+
+  // position: ordinal al final de la lista actual; el render por ahora
+  // usa created_at desc, pero dejamos el campo poblado para futuras
+  // reordenaciones.
+  const { error } = await sb.from('festival_videos').insert({
+    festival_id:   fid,
+    youtube_id:    videoPreviewData.youtube_id,
+    url:           videoPreviewData.url,
+    title:         videoPreviewData.title,
+    thumbnail_url: videoPreviewData.thumbnail_url,
+    position:      festivalVideos.length,
+  });
+  if (error) return showVideoFeedback('Error: ' + error.message, 'err');
+
+  document.getElementById('video-url-input').value = '';
+  document.getElementById('video-preview').style.display = 'none';
+  videoPreviewData = null;
+  showVideoFeedback('✓ Vídeo añadido', 'ok');
+  await loadFestivalVideos();
+}
+
+async function removeFestivalVideo(id) {
+  const v = festivalVideos.find(x => x.id === id);
+  if (!v) return;
+  if (!confirm(`Quitar "${v.title}" del festival?`)) return;
+  const { error } = await sb.from('festival_videos').delete().eq('id', id);
+  if (error) return showVideoFeedback('Error: ' + error.message, 'err');
+  await loadFestivalVideos();
+}
+
+async function loadFestivalVideos() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) {
+    festivalVideos = [];
+    renderFestivalVideosList();
+    return;
+  }
+  // Orden DESC por created_at: lo último añadido arriba. La columna
+  // `position` queda preparada para futuras reordenaciones manuales.
+  const { data, error } = await sb.from('festival_videos')
+    .select('*')
+    .eq('festival_id', fid)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('loadFestivalVideos', error); return; }
+  festivalVideos = data || [];
+  renderFestivalVideosList();
+}
+
+function renderFestivalVideosList() {
+  const list   = document.getElementById('videos-list');
+  const count  = document.getElementById('videos-count');
+  const nofest = document.getElementById('videos-no-festival');
+  const form   = document.getElementById('videos-form');
+  if (!list || !count) return;
+
+  count.textContent = `(${festivalVideos.length})`;
+
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) {
+    list.innerHTML = '';
+    nofest.style.display = 'block';
+    form.style.display = 'none';
+    return;
+  }
+  nofest.style.display = 'none';
+  form.style.display = '';
+
+  if (festivalVideos.length === 0) {
+    list.innerHTML = '<div class="videos-empty">Sin vídeos en este festival</div>';
+    return;
+  }
+
+  list.innerHTML = festivalVideos.map(v => `
+    <div class="video-row" data-id="${v.id}">
+      <img src="${escapeAttr(v.thumbnail_url || '')}" alt="" loading="lazy" />
+      <a href="${escapeAttr(v.url)}" target="_blank" rel="noopener">${escapeHtml(v.title)}</a>
+      <button class="video-remove" onclick="removeFestivalVideo('${v.id}')" title="Quitar">✕</button>
+    </div>
+  `).join('');
+}
+
+// Canal propio (no fusionado con players-view): los vídeos viven en la
+// vista Feed, no en Jugadores; mantenerlos separados simplifica el
+// ciclo de vida — siempre activo mientras haya festival, sin importar
+// la sub-vista.
+function subscribeFestivalVideosRealtime() {
+  if (videosRealtimeChannel) {
+    try { sb.removeChannel(videosRealtimeChannel); } catch(_) {}
+    videosRealtimeChannel = null;
+  }
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return;
+  videosRealtimeChannel = sb.channel('festival-videos:' + fid)
+    .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'festival_videos', filter: `festival_id=eq.${fid}` },
+        () => loadFestivalVideos())
+    .subscribe();
+}
 
 // ── CHECK SESSION ─────────────────────────────────────────────
 (async () => {
