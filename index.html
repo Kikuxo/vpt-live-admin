@@ -506,6 +506,19 @@
     gap: 8px;
   }
 
+  .post-image {
+    margin-top: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .post-image img {
+    width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+    display: block;
+  }
+
   .extra-stat {
     display: flex;
     flex-direction: column;
@@ -674,9 +687,24 @@
             <input type="text" id="extra-media" placeholder="ej. 48.000" />
           </div>
           <div class="info-field">
-            <label>BLINDS</label>
-            <input type="text" id="extra-blinds" placeholder="ej. 1k/2k/2k" />
+            <label>NIVEL</label>
+            <input type="text" id="extra-blinds" placeholder="ej. 1.000/2.000" />
           </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Imagen Flickr -->
+      <div>
+        <div class="panel-title" style="margin-bottom:10px;">📸 Foto (opcional)</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="input-flickr-url" placeholder="https://flickr.com/photos/vamospokertour/55163050984/" style="flex:1;" oninput="previewFlickr()" />
+          <button onclick="previewFlickr()" style="padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--white);cursor:pointer;font-size:12px;white-space:nowrap;">Vista previa</button>
+        </div>
+        <div id="flickr-preview" style="margin-top:8px;display:none;">
+          <img id="flickr-img" src="" style="width:100%;border-radius:8px;border:1px solid var(--border);max-height:200px;object-fit:cover;" />
+          <div id="flickr-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
         </div>
       </div>
 
@@ -769,6 +797,69 @@ function selectCat(id) {
 }
 
 // ── AUTH ──────────────────────────────────────────────────────
+// ── FLICKR PREVIEW ───────────────────────────────────────────
+async function previewFlickr() {
+  const input = document.getElementById('input-flickr-url').value.trim();
+  const preview = document.getElementById('flickr-preview');
+  const img = document.getElementById('flickr-img');
+  const status = document.getElementById('flickr-status');
+
+  // Asegurar campo hidden para la URL resuelta
+  if (!document.getElementById('flickr-resolved-url')) {
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = 'flickr-resolved-url';
+    document.body.appendChild(hidden);
+  }
+  document.getElementById('flickr-resolved-url').value = '';
+
+  if (!input) { preview.style.display = 'none'; return; }
+
+  // Extraer photo_id del URL de Flickr
+  // Formatos: flickr.com/photos/USER/PHOTO_ID/ o flic.kr/p/xxx
+  const match = input.match(/flickr\.com\/photos\/[^/]+\/(\d+)/);
+  if (!match) {
+    status.textContent = '⚠️ URL no reconocida. Usa: flickr.com/photos/usuario/ID/';
+    preview.style.display = 'block';
+    img.style.display = 'none';
+    return;
+  }
+
+  const photoId = match[1];
+  status.textContent = '⏳ Cargando imagen...';
+  preview.style.display = 'block';
+  img.style.display = 'none';
+
+  try {
+    const apiKey = '79149d5e240c4f5020f6d6bd8f93b2da';
+    const apiUrl = `https://api.flickr.com/services/rest/?method=flickr.photos.getSizes&api_key=${apiKey}&photo_id=${photoId}&format=json&nojsoncallback=1`;
+    const resp = await fetch(apiUrl);
+    const data = await resp.json();
+
+    if (data.stat !== 'ok') {
+      status.textContent = '❌ Foto no encontrada o privada.';
+      return;
+    }
+
+    // Elegir el tamaño Large (1024) o el más grande disponible
+    const sizes = data.sizes.size;
+    const large = sizes.find(s => s.label === 'Large') ||
+                  sizes.find(s => s.label === 'Medium 800') ||
+                  sizes.find(s => s.label === 'Medium 640') ||
+                  sizes[sizes.length - 1];
+
+    img.src = large.source;
+    img.style.display = 'block';
+    status.textContent = `✓ ${large.label} · ${large.width}×${large.height}px`;
+
+    // Guardar la URL resuelta para el insert
+    document.getElementById('flickr-resolved-url').value = large.source;
+
+  } catch(e) {
+    status.textContent = '❌ Error al cargar la imagen: ' + e.message;
+  }
+}
+
 async function login() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-pass').value;
@@ -954,12 +1045,16 @@ async function publishPost() {
   btn.disabled = true;
   btn.innerHTML = '<span>⏳</span> Publicando...';
 
+  // Imagen Flickr
+  const imageUrl = document.getElementById('flickr-resolved-url')?.value || null;
+
   const { error } = await sb.from('live_updates').insert({
     festival_id: festivalId,
     type,
     title: title || null,
     body: body || null,
     extra: Object.keys(extra).length > 0 ? extra : null,
+    image_url: imageUrl,
     published: true,
   });
 
@@ -983,6 +1078,10 @@ function clearForm() {
   document.getElementById('extra-players').value = '';
   document.getElementById('extra-media').value = '';
   document.getElementById('extra-blinds').value = '';
+  document.getElementById('input-flickr-url').value = '';
+  document.getElementById('flickr-preview').style.display = 'none';
+  const resolvedEl = document.getElementById('flickr-resolved-url');
+  if (resolvedEl) resolvedEl.value = '';
   // No limpiar festival ni torneo ni categoría — es probable que se siga usando
 }
 
