@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VPT Live Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --surface2: #181c23;
+    --border: #222630;
+    --border2: #2a3040;
+    --gold: #C9A84C;
+    --gold-dim: #8a6e2e;
+    --white: #f0f2f5;
+    --muted: #5a6278;
+    --green: #3dba6e;
+    --red: #e05252;
+    --blue: #4a9eff;
+    --orange: #f0852a;
+    --purple: #9b6dff;
+    --teal: #2dcec8;
+    --pink: #ff6b9d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--white);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── LOGIN ───────────────────────────── */
+  #login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 20% 50%, #1a1500 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, #0d1a0a 0%, transparent 50%),
+                var(--bg);
+  }
+
+  .login-box {
+    width: 380px;
+    padding: 48px 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .login-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .login-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--white);
+    margin-bottom: 32px;
+    line-height: 1.1;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--gold); }
+
+  .btn-primary {
+    width: 100%;
+    padding: 13px;
+    background: var(--gold);
+    border: none;
+    border-radius: 8px;
+    color: #0a0c0f;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity .15s;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { opacity: .85; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+  .login-error {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: rgba(224,82,82,.12);
+    border: 1px solid rgba(224,82,82,.3);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--red);
+    display: none;
+  }
+
+  /* ── APP ─────────────────────────────── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+
+  /* Header */
+  .header {
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--gold);
+  }
+
+  .header-sep { width: 1px; height: 20px; background: var(--border2); }
+
+  .header-live {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 500;
+    letter-spacing: 1px;
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .5; transform: scale(.8); }
+  }
+
+  .header-user {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .user-avatar {
+    width: 28px; height: 28px;
+    background: var(--gold-dim);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .btn-logout {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+  /* Main layout */
+  .main {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    flex: 1;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* ── LEFT PANEL — Formulario ─────────── */
+  .panel-form {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .select-group { display: flex; flex-direction: column; gap: 10px; }
+
+  select, textarea, input[type=text], input[type=number] {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+    appearance: none;
+  }
+  select:focus, textarea:focus, input:focus { border-color: var(--gold); }
+
+  select option { background: var(--surface2); }
+
+  /* Categorías */
+  .cat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .cat-btn {
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+    background: var(--surface2);
+    color: var(--muted);
+  }
+
+  .cat-btn.active {
+    color: var(--white);
+  }
+
+  .cat-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Info box */
+  .info-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .info-box-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .info-field label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: .5px;
+  }
+
+  .info-field input {
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Botón publicar */
+  .btn-publish {
+    padding: 14px;
+    background: var(--green);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-publish:hover { background: #2ea85e; }
+  .btn-publish:disabled { background: var(--muted); cursor: not-allowed; }
+
+  .publish-feedback {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: center;
+    display: none;
+  }
+  .publish-feedback.ok { background: rgba(61,186,110,.12); border: 1px solid rgba(61,186,110,.3); color: var(--green); }
+  .publish-feedback.err { background: rgba(224,82,82,.12); border: 1px solid rgba(224,82,82,.3); color: var(--red); }
+
+  /* ── RIGHT PANEL — Feed en vivo ──────── */
+  .panel-feed {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .feed-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .feed-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .feed-count {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .feed-filter {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+
+  .filter-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .filter-btn.active { background: var(--gold); border-color: var(--gold); color: #0a0c0f; font-weight: 600; }
+
+  .feed-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Post card */
+  .post-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color .15s;
+    animation: slideIn .25s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .post-card:hover { border-color: var(--border2); }
+
+  .post-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .post-cat-badge {
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .post-tournament {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .post-time {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .post-delete {
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .post-delete:hover { border-color: var(--red); color: var(--red); }
+
+  .post-body {
+    padding: 14px 16px;
+  }
+
+  .post-title-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .post-body-text {
+    font-size: 13px;
+    color: #aab0be;
+    line-height: 1.55;
+  }
+
+  .post-extra {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .extra-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .extra-label {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .extra-value {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    color: var(--white);
+  }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    gap: 8px;
+    padding: 60px;
+    text-align: center;
+  }
+
+  .empty-icon { font-size: 40px; opacity: .3; }
+  .empty-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; }
+  .empty-sub { font-size: 12px; line-height: 1.5; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* Textarea */
+  textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+  /* Custom input extra categoría */
+  .cat-extra-input {
+    display: none;
+    margin-top: 6px;
+  }
+  .cat-extra-input.show { display: block; }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Festival selector highlight */
+  .festival-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(201,168,76,.08);
+    border: 1px solid rgba(201,168,76,.2);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--gold);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .panel-feed { min-height: 400px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Vamos Poker Tour</div>
+    <div class="login-title">Live Admin<br>Panel</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="tu@email.com" />
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" />
+    </div>
+    <button class="btn-primary" id="login-btn" onclick="login()">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-logo">VPT</div>
+    <div class="header-sep"></div>
+    <div class="header-live">
+      <div class="live-dot"></div>
+      LIVE ADMIN
+    </div>
+    <div class="header-user">
+      <div class="user-avatar" id="user-initials">—</div>
+      <span id="user-email-display" style="font-size:12px;"></span>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- PANEL IZQUIERDO: Formulario -->
+    <div class="panel-form">
+      <div class="panel-title">Nuevo Post</div>
+
+      <!-- Festival y Torneo -->
+      <div class="select-group">
+        <select id="sel-festival" onchange="onFestivalChange()">
+          <option value="">Cargando festivales...</option>
+        </select>
+        <input type="text" id="input-tournament" placeholder="Torneo (ej. Main Event, High Roller...)" />
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Categoría -->
+      <div>
+        <div class="panel-title" style="margin-bottom:10px;">Categoría</div>
+        <div class="cat-grid" id="cat-grid"></div>
+        <div class="cat-extra-input" id="cat-extra-wrap">
+          <input type="text" id="cat-extra-input" placeholder="Escribe la categoría..." />
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Título y Cuerpo -->
+      <div class="select-group">
+        <input type="text" id="input-title" placeholder="Título del post" />
+        <textarea id="input-body" placeholder="Descripción, contexto, detalles..." rows="4"></textarea>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Info Box -->
+      <div class="info-box">
+        <div class="info-box-title">📊 Datos del momento (opcional)</div>
+        <div class="info-grid">
+          <div class="info-field">
+            <label>NIVEL</label>
+            <input type="text" id="extra-nivel" placeholder="ej. 12" />
+          </div>
+          <div class="info-field">
+            <label>JUGADORES</label>
+            <input type="text" id="extra-players" placeholder="ej. 47/200" />
+          </div>
+          <div class="info-field">
+            <label>MEDIA</label>
+            <input type="text" id="extra-media" placeholder="ej. 48.000" />
+          </div>
+          <div class="info-field">
+            <label>BLINDS</label>
+            <input type="text" id="extra-blinds" placeholder="ej. 1k/2k/2k" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Publicar -->
+      <button class="btn-publish" id="publish-btn" onclick="publishPost()">
+        <span>⚡</span> Publicar ahora
+      </button>
+      <div class="publish-feedback" id="pub-feedback"></div>
+    </div>
+
+    <!-- PANEL DERECHO: Feed -->
+    <div class="panel-feed">
+      <div class="feed-header">
+        <div class="feed-title">Feed en vivo</div>
+        <div class="feed-count" id="feed-count">0 posts</div>
+        <div class="feed-filter">
+          <button class="filter-btn active" onclick="setFilter('all', this)">Todos</button>
+          <button class="filter-btn" onclick="setFilter('festival', this)">Este festival</button>
+        </div>
+      </div>
+      <div class="feed-scroll" id="feed-scroll">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">📡</div>
+          <div class="empty-title">Sin posts todavía</div>
+          <div class="empty-sub">Selecciona un festival y publica<br>el primer update en directo</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── SUPABASE ──────────────────────────────────────────────────
+const SUPABASE_URL = 'https://rkaanxwiboazgutphwzx.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrYWFueHdpYm9hemd1dHBod3p4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0ODY5OTcsImV4cCI6MjA5MjA2Mjk5N30.3Umdbbx4zmHaW2F43uVOGEwsl7EzEgur-_YaN91Ing8';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── CATEGORÍAS ────────────────────────────────────────────────
+const CATEGORIES = [
+  { id: 'info',       label: 'Información',  icon: 'ℹ️',  color: '#4a9eff', bg: 'rgba(74,158,255,.12)', border: 'rgba(74,158,255,.3)' },
+  { id: 'chipcount',  label: 'Chip Count',   icon: '📊',  color: '#C9A84C', bg: 'rgba(201,168,76,.12)', border: 'rgba(201,168,76,.3)' },
+  { id: 'prize',      label: 'Premios',      icon: '🏆',  color: '#f0852a', bg: 'rgba(240,133,42,.12)', border: 'rgba(240,133,42,.3)' },
+  { id: 'result',     label: 'Resultado',    icon: '✅',  color: '#3dba6e', bg: 'rgba(61,186,110,.12)', border: 'rgba(61,186,110,.3)' },
+  { id: 'elim',       label: 'Eliminación',  icon: '💀',  color: '#e05252', bg: 'rgba(224,82,82,.12)',  border: 'rgba(224,82,82,.3)'  },
+  { id: 'announce',   label: 'Anuncio',      icon: '📢',  color: '#9b6dff', bg: 'rgba(155,109,255,.12)',border: 'rgba(155,109,255,.3)' },
+  { id: 'levelup',    label: 'Nuevo Nivel',  icon: '🔼',  color: '#2dcec8', bg: 'rgba(45,206,200,.12)', border: 'rgba(45,206,200,.3)'  },
+  { id: 'other',      label: 'Otro',         icon: '➕',  color: '#5a6278', bg: 'rgba(90,98,120,.12)',  border: 'rgba(90,98,120,.3)'   },
+];
+
+let selectedCat = null;
+let currentFilter = 'all';
+let allPosts = [];
+let festivals = [];
+let refreshInterval = null;
+
+// ── INIT CATEGORÍAS ───────────────────────────────────────────
+function initCats() {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn';
+    btn.dataset.id = cat.id;
+    btn.innerHTML = `<span class="cat-dot" style="background:${cat.color}"></span>${cat.icon} ${cat.label}`;
+    btn.onclick = () => selectCat(cat.id);
+    grid.appendChild(btn);
+  });
+}
+
+function selectCat(id) {
+  selectedCat = id;
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.classList.remove('active');
+    b.style.borderColor = 'transparent';
+    b.style.background = 'var(--surface2)';
+    b.style.color = 'var(--muted)';
+  });
+  const btn = document.querySelector(`.cat-btn[data-id="${id}"]`);
+  const cat = CATEGORIES.find(c => c.id === id);
+  if (btn && cat) {
+    btn.classList.add('active');
+    btn.style.borderColor = cat.border;
+    btn.style.background = cat.bg;
+    btn.style.color = cat.color;
+  }
+  const extraWrap = document.getElementById('cat-extra-wrap');
+  if (id === 'other') extraWrap.classList.add('show');
+  else extraWrap.classList.remove('show');
+}
+
+// ── AUTH ──────────────────────────────────────────────────────
+async function login() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-error');
+
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  err.style.display = 'none';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    err.textContent = 'Credenciales incorrectas. Comprueba tu email y contraseña.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+    return;
+  }
+  showApp(data.user);
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  clearInterval(refreshInterval);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp(user) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  const name = user.email.split('@')[0];
+  document.getElementById('user-initials').textContent = name.substring(0,2).toUpperCase();
+  document.getElementById('user-email-display').textContent = user.email;
+
+  initCats();
+  loadFestivals();
+  loadPosts();
+  // Refresco automático cada 15 segundos
+  refreshInterval = setInterval(loadPosts, 15000);
+}
+
+// ── FESTIVALS ─────────────────────────────────────────────────
+async function loadFestivals() {
+  const { data } = await sb.from('festivals').select('id,title,flag_emoji,is_live').order('starts_at', { ascending: false }).limit(20);
+  festivals = data || [];
+  const sel = document.getElementById('sel-festival');
+  sel.innerHTML = '<option value="">— Selecciona festival —</option>';
+  festivals.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.id;
+    opt.textContent = `${f.flag_emoji || '🎴'} ${f.title}${f.is_live ? ' 🟢' : ''}`;
+    if (f.is_live) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function onFestivalChange() {
+  if (currentFilter === 'festival') loadPosts();
+}
+
+// ── POSTS ─────────────────────────────────────────────────────
+async function loadPosts() {
+  let query = sb.from('live_updates')
+    .select('*')
+    .eq('published', true)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (currentFilter === 'festival') {
+    const fId = document.getElementById('sel-festival').value;
+    if (fId) query = query.eq('festival_id', fId);
+  }
+
+  const { data } = await query;
+  allPosts = data || [];
+  renderPosts();
+}
+
+function renderPosts() {
+  const scroll = document.getElementById('feed-scroll');
+  const empty  = document.getElementById('empty-state');
+  const count  = document.getElementById('feed-count');
+
+  count.textContent = `${allPosts.length} post${allPosts.length !== 1 ? 's' : ''}`;
+
+  if (allPosts.length === 0) {
+    scroll.innerHTML = '';
+    scroll.appendChild(empty);
+    empty.style.display = 'flex';
+    return;
+  }
+
+  empty.style.display = 'none';
+  scroll.innerHTML = '';
+  allPosts.forEach(p => scroll.appendChild(buildPostCard(p)));
+}
+
+function buildPostCard(post) {
+  const cat     = CATEGORIES.find(c => c.id === post.type) || { label: post.type, color: '#5a6278', bg: 'rgba(90,98,120,.12)', border: 'rgba(90,98,120,.3)', icon: '📌' };
+  const dt      = new Date(post.created_at);
+  const timeStr = `${dt.getDate()}/${dt.getMonth()+1} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  const extra   = post.extra;
+
+  // Torneo viene en extra.Torneo o en body
+  const tournament = extra?.Torneo || post.body?.match(/Torneo: ([^\n]+)/)?.[1] || '';
+
+  const card = document.createElement('div');
+  card.className = 'post-card';
+  card.innerHTML = `
+    <div class="post-header">
+      <span class="post-cat-badge" style="background:${cat.bg};color:${cat.color};border:1px solid ${cat.border}">${cat.icon || ''} ${cat.label}</span>
+      ${tournament ? `<span class="post-tournament">· ${tournament}</span>` : ''}
+      <span class="post-time">${timeStr}</span>
+      <button class="post-delete" onclick="deletePost('${post.id}', this)" title="Eliminar">✕</button>
+    </div>
+    <div class="post-body">
+      ${post.title ? `<div class="post-title-text">${post.title}</div>` : ''}
+      ${post.body ? `<div class="post-body-text">${post.body}</div>` : ''}
+      ${extra && Object.keys(extra).length > 0 ? `
+        <div class="post-extra">
+          ${extra.Nivel     ? `<div class="extra-stat"><div class="extra-label">Nivel</div><div class="extra-value">${extra.Nivel}</div></div>` : ''}
+          ${extra.Jugadores ? `<div class="extra-stat"><div class="extra-label">Jugadores</div><div class="extra-value">${extra.Jugadores}</div></div>` : ''}
+          ${extra.Media     ? `<div class="extra-stat"><div class="extra-label">Media</div><div class="extra-value">${extra.Media}</div></div>` : ''}
+          ${extra.Blinds    ? `<div class="extra-stat"><div class="extra-label">Blinds</div><div class="extra-value">${extra.Blinds}</div></div>` : ''}
+          ${extra.Torneo    ? `<div class="extra-stat"><div class="extra-label">Torneo</div><div class="extra-value">${extra.Torneo}</div></div>` : ''}
+        </div>` : ''}
+    </div>`;
+  return card;
+}
+
+// ── PUBLICAR ──────────────────────────────────────────────────
+async function publishPost() {
+  const festivalId = document.getElementById('sel-festival').value;
+  const tournament = document.getElementById('input-tournament').value.trim();
+  const title      = document.getElementById('input-title').value.trim();
+  const body       = document.getElementById('input-body').value.trim();
+  const nivel      = document.getElementById('extra-nivel').value.trim();
+  const players    = document.getElementById('extra-players').value.trim();
+  const media      = document.getElementById('extra-media').value.trim();
+  const blinds     = document.getElementById('extra-blinds').value.trim();
+
+  // Validaciones
+  if (!festivalId) return showFeedback('Selecciona un festival primero', 'err');
+  if (!selectedCat) return showFeedback('Selecciona una categoría', 'err');
+  if (!title && !body) return showFeedback('Escribe al menos un título o descripción', 'err');
+
+  // Tipo final
+  let type = selectedCat;
+  if (selectedCat === 'other') {
+    const customCat = document.getElementById('cat-extra-input').value.trim();
+    type = customCat || 'update';
+  }
+
+  // Extra data
+  const extra = {};
+  if (tournament) extra['Torneo'] = tournament;
+  if (nivel)    extra['Nivel'] = nivel;
+  if (players)  extra['Jugadores'] = players;
+  if (media)    extra['Media'] = media;
+  if (blinds)   extra['Blinds'] = blinds;
+
+  const btn = document.getElementById('publish-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Publicando...';
+
+  const { error } = await sb.from('live_updates').insert({
+    festival_id: festivalId,
+    type,
+    title: title || null,
+    body: body || null,
+    extra: Object.keys(extra).length > 0 ? extra : null,
+    published: true,
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>⚡</span> Publicar ahora';
+
+  if (error) {
+    showFeedback('Error al publicar: ' + error.message, 'err');
+    return;
+  }
+
+  showFeedback('✓ Publicado correctamente', 'ok');
+  clearForm();
+  loadPosts();
+}
+
+function clearForm() {
+  document.getElementById('input-title').value = '';
+  document.getElementById('input-body').value = '';
+  document.getElementById('extra-nivel').value = '';
+  document.getElementById('extra-players').value = '';
+  document.getElementById('extra-media').value = '';
+  document.getElementById('extra-blinds').value = '';
+  // No limpiar festival ni torneo ni categoría — es probable que se siga usando
+}
+
+function showFeedback(msg, type) {
+  const el = document.getElementById('pub-feedback');
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + type;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3500);
+}
+
+// ── ELIMINAR ──────────────────────────────────────────────────
+async function deletePost(id, btn) {
+  if (!confirm('¿Eliminar este post del feed en directo?')) return;
+  btn.textContent = '...';
+  await sb.from('live_updates').delete().eq('id', id);
+  loadPosts();
+}
+
+// ── FILTRO ────────────────────────────────────────────────────
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadPosts();
+}
+
+// ── CHECK SESSION ─────────────────────────────────────────────
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data?.session?.user) {
+    showApp(data.session.user);
+  }
+})();
+
+// Enter en login
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>
