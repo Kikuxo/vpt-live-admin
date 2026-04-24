@@ -776,7 +776,7 @@ async function login() {
   const err   = document.getElementById('login-error');
 
   btn.disabled = true;
-  btn.textContent = 'Entrando...';
+  btn.textContent = 'Verificando...';
   err.style.display = 'none';
 
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
@@ -787,7 +787,25 @@ async function login() {
     btn.textContent = 'Entrar';
     return;
   }
-  showApp(data.user);
+
+  // Verificar que el usuario es admin
+  const { data: adminData, error: adminError } = await sb
+    .from('live_admins')
+    .select('id, name')
+    .eq('user_id', data.user.id)
+    .single();
+
+  if (adminError || !adminData) {
+    // No es admin — cerrar sesión y rechazar
+    await sb.auth.signOut();
+    err.textContent = '⛔ Acceso restringido. Solo administradores VPT pueden acceder.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+    return;
+  }
+
+  showApp(data.user, adminData.name);
 }
 
 async function logout() {
@@ -797,13 +815,13 @@ async function logout() {
   document.getElementById('login-screen').style.display = 'flex';
 }
 
-function showApp(user) {
+function showApp(user, adminName) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 
-  const name = user.email.split('@')[0];
-  document.getElementById('user-initials').textContent = name.substring(0,2).toUpperCase();
-  document.getElementById('user-email-display').textContent = user.email;
+  const displayName = adminName || user.email.split('@')[0];
+  document.getElementById('user-initials').textContent = displayName.substring(0,2).toUpperCase();
+  document.getElementById('user-email-display').textContent = adminName ? adminName + ' · ' + user.email : user.email;
 
   initCats();
   loadFestivals();
@@ -996,7 +1014,17 @@ function setFilter(filter, btn) {
 (async () => {
   const { data } = await sb.auth.getSession();
   if (data?.session?.user) {
-    showApp(data.session.user);
+    // Verificar admin también al restaurar sesión
+    const { data: adminData } = await sb
+      .from('live_admins')
+      .select('id, name')
+      .eq('user_id', data.session.user.id)
+      .single();
+    if (adminData) {
+      showApp(data.session.user, adminData.name);
+    } else {
+      await sb.auth.signOut();
+    }
   }
 })();
 
