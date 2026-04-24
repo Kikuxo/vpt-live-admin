@@ -727,6 +727,12 @@
     align-items: center;
     gap: 6px;
   }
+  .player-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+  }
   .player-flag {
     display: inline-block;
     padding: 1px 6px;
@@ -737,6 +743,13 @@
     border: 1px solid var(--border2);
     color: var(--white);
     letter-spacing: .8px;
+  }
+  /* Bandera emoji inline — mismo hueco que el pill pero sin caja */
+  .flag-emoji {
+    display: inline-block;
+    font-size: 13px;
+    line-height: 1;
+    vertical-align: -1px;
   }
   .player-rank {
     color: var(--gold-dim);
@@ -1013,6 +1026,146 @@
     margin-top: 4px;
   }
 
+  /* Preview del campo photo_url (Flickr o URL directa) en alta/edición de jugador */
+  .photo-field { display: flex; flex-direction: column; gap: 6px; }
+  .photo-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .photo-preview img {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border2);
+    background: var(--bg);
+  }
+  .photo-status {
+    flex: 1;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+
+  /* ── BADGES de jugador ────────────────────────────────────── */
+  .badges-section { display: flex; flex-direction: column; gap: 6px; }
+  .section-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-weight: 600;
+  }
+  .badges-assigned {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    min-height: 22px;
+  }
+  .badges-empty {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .2px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .badge-pill-sm {
+    font-size: 9.5px;
+    padding: 1px 6px;
+  }
+  .badge-pill-x {
+    cursor: pointer;
+    opacity: .55;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 2px;
+  }
+  .badge-pill-x:hover { opacity: 1; }
+  .badges-picker { position: relative; }
+  .badge-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    display: none;
+    z-index: 100;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  .badge-dropdown.show { display: block; }
+  .badge-option {
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--white);
+  }
+  .badge-option:hover { background: var(--surface2); }
+  .badge-option-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .badge-option-create {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding: 10px 8px 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    cursor: default;
+  }
+  .badge-option-create:hover { background: transparent; }
+  .badge-create-btn {
+    cursor: pointer;
+    color: var(--gold);
+    font-weight: 600;
+    padding: 4px 0;
+  }
+  .badge-create-btn:hover { text-decoration: underline; }
+  .badge-color-picker {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .badge-color-picker-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-right: 4px;
+  }
+  .badge-color-swatch {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform .1s;
+  }
+  .badge-color-swatch:hover { transform: scale(1.1); }
+  .badge-color-swatch.selected { border-color: var(--white); }
+
   /* ── CHIP COUNTS en el formulario ─────────────────────────── */
   .chipcounts-section {
     display: flex;
@@ -1094,24 +1247,13 @@
   }
   .post-chipcounts-row {
     display: grid;
-    grid-template-columns: 32px 28px 1fr auto;
+    grid-template-columns: 28px 1fr auto;
     align-items: center;
     gap: 8px;
     padding: 6px 0;
     border-bottom: 1px solid var(--border);
   }
   .post-chipcounts-row:last-child { border-bottom: none; }
-  .post-chipcounts-pos {
-    font-family: 'Syne', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--muted);
-    text-align: center;
-  }
-  .post-chipcounts-pos.medal {
-    font-size: 16px;
-    font-family: inherit;
-  }
   .post-chipcounts-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
@@ -1142,6 +1284,11 @@
   .post-chipcounts-missing {
     font-style: italic;
     color: var(--muted);
+  }
+  .post-chipcounts-badge .badge-pill {
+    font-size: 9.5px;
+    padding: 1px 5px;
+    line-height: 1.3;
   }
 
   /* Render chip de mención dentro de posts del feed */
@@ -1353,7 +1500,14 @@
             <input type="number" id="pl-rank" placeholder="—" />
           </div>
         </div>
-        <input type="text" id="pl-photo" placeholder="URL de foto (opcional)" />
+        <div class="photo-field">
+          <input type="text" id="pl-photo" placeholder="URL de foto (Flickr o directa, opcional)" onblur="previewFlickrPlayer('pl')" />
+          <input type="hidden" id="pl-photo-resolved" />
+          <div id="pl-photo-preview" class="photo-preview" style="display:none;">
+            <img id="pl-photo-img" src="" alt="" />
+            <div id="pl-photo-status" class="photo-status"></div>
+          </div>
+        </div>
         <button class="btn-primary" onclick="createPlayerFromForm()" style="margin-top:4px;">Añadir al catálogo</button>
         <div id="pl-create-feedback" class="publish-feedback" style="margin-top:4px;"></div>
       </div>
@@ -1436,7 +1590,23 @@
           <input type="number" id="pe-rank" placeholder="—" />
         </div>
       </div>
-      <input type="text" id="pe-photo" placeholder="URL de foto (opcional)" />
+      <div class="photo-field">
+        <input type="text" id="pe-photo" placeholder="URL de foto (Flickr o directa, opcional)" onblur="previewFlickrPlayer('pe')" />
+        <input type="hidden" id="pe-photo-resolved" />
+        <div id="pe-photo-preview" class="photo-preview" style="display:none;">
+          <img id="pe-photo-img" src="" alt="" />
+          <div id="pe-photo-status" class="photo-status"></div>
+        </div>
+      </div>
+      <div class="badges-section">
+        <label class="section-label">Badges</label>
+        <div id="pe-badges-assigned" class="badges-assigned"></div>
+        <div class="badges-picker">
+          <input type="text" id="pe-badge-input" placeholder="Buscar o crear badge..." autocomplete="off"
+                 oninput="handleBadgeInput()" onfocus="handleBadgeInput()" onblur="hideBadgeDropdown()" />
+          <div id="pe-badge-dropdown" class="badge-dropdown"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn-mini danger" onclick="deleteCatalogPlayer()">Eliminar jugador</button>
@@ -1512,6 +1682,39 @@ function selectCat(id) {
 
 // ── AUTH ──────────────────────────────────────────────────────
 // ── FLICKR PREVIEW ───────────────────────────────────────────
+// Flickr sirve páginas HTML en flickr.com/photos/USER/ID/ — los <img src>
+// apuntando ahí no renderizan. Hay que resolver a una URL directa vía API.
+const FLICKR_API_KEY = '79149d5e240c4f5020f6d6bd8f93b2da';
+
+function extractFlickrPhotoId(url) {
+  if (!url) return null;
+  const m = url.match(/flickr\.com\/photos\/[^/]+\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+function isDirectImageUrl(url) {
+  // Imagen directa servida por Flickr CDN o cualquier URL con extensión de imagen.
+  if (!url) return false;
+  if (/staticflickr\.com\//i.test(url)) return true;
+  return /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(url);
+}
+
+// Resuelve una photo_id de Flickr al source de un tamaño preferido.
+// `preferredLabels` se prueba en orden; si ninguno está disponible, cae al
+// último de la lista devuelta por la API (suele ser el mayor).
+async function fetchFlickrSize(photoId, preferredLabels) {
+  const apiUrl = `https://api.flickr.com/services/rest/?method=flickr.photos.getSizes&api_key=${FLICKR_API_KEY}&photo_id=${photoId}&format=json&nojsoncallback=1`;
+  const resp = await fetch(apiUrl);
+  const data = await resp.json();
+  if (data.stat !== 'ok') throw new Error(data.message || 'Foto no encontrada o privada.');
+  const sizes = data.sizes.size;
+  for (const label of preferredLabels) {
+    const hit = sizes.find(s => s.label === label);
+    if (hit) return hit;
+  }
+  return sizes[sizes.length - 1];
+}
+
 async function previewFlickr() {
   const input = document.getElementById('input-flickr-url').value.trim();
   const preview = document.getElementById('flickr-preview');
@@ -1529,48 +1732,76 @@ async function previewFlickr() {
 
   if (!input) { preview.style.display = 'none'; return; }
 
-  // Extraer photo_id del URL de Flickr
-  // Formatos: flickr.com/photos/USER/PHOTO_ID/ o flic.kr/p/xxx
-  const match = input.match(/flickr\.com\/photos\/[^/]+\/(\d+)/);
-  if (!match) {
+  const photoId = extractFlickrPhotoId(input);
+  if (!photoId) {
     status.textContent = '⚠️ URL no reconocida. Usa: flickr.com/photos/usuario/ID/';
     preview.style.display = 'block';
     img.style.display = 'none';
     return;
   }
 
-  const photoId = match[1];
   status.textContent = '⏳ Cargando imagen...';
   preview.style.display = 'block';
   img.style.display = 'none';
 
   try {
-    const apiKey = '79149d5e240c4f5020f6d6bd8f93b2da';
-    const apiUrl = `https://api.flickr.com/services/rest/?method=flickr.photos.getSizes&api_key=${apiKey}&photo_id=${photoId}&format=json&nojsoncallback=1`;
-    const resp = await fetch(apiUrl);
-    const data = await resp.json();
-
-    if (data.stat !== 'ok') {
-      status.textContent = '❌ Foto no encontrada o privada.';
-      return;
-    }
-
-    // Elegir el tamaño Large (1024) o el más grande disponible
-    const sizes = data.sizes.size;
-    const large = sizes.find(s => s.label === 'Large') ||
-                  sizes.find(s => s.label === 'Medium 800') ||
-                  sizes.find(s => s.label === 'Medium 640') ||
-                  sizes[sizes.length - 1];
-
-    img.src = large.source;
+    // Posts: priorizamos Large (cover ancho del feed).
+    const picked = await fetchFlickrSize(photoId, ['Large', 'Medium 800', 'Medium 640']);
+    img.src = picked.source;
     img.style.display = 'block';
-    status.textContent = `✓ ${large.label} · ${large.width}×${large.height}px`;
-
-    // Guardar la URL resuelta para el insert
-    document.getElementById('flickr-resolved-url').value = large.source;
-
+    status.textContent = `✓ ${picked.label} · ${picked.width}×${picked.height}px`;
+    document.getElementById('flickr-resolved-url').value = picked.source;
   } catch(e) {
-    status.textContent = '❌ Error al cargar la imagen: ' + e.message;
+    status.textContent = '❌ ' + e.message;
+  }
+}
+
+// Preview/resolve Flickr para los campos photo_url de jugadores.
+// `scope` es 'pl' (alta catálogo) o 'pe' (modal edición). Para jugadores
+// pedimos tamaños pequeños (avatar circular ~40–64px): Small 400 como techo.
+async function previewFlickrPlayer(scope) {
+  const input   = document.getElementById(`${scope}-photo`);
+  const preview = document.getElementById(`${scope}-photo-preview`);
+  const img     = document.getElementById(`${scope}-photo-img`);
+  const status  = document.getElementById(`${scope}-photo-status`);
+  const resolved= document.getElementById(`${scope}-photo-resolved`);
+  if (!input || !preview) return;
+
+  const raw = input.value.trim();
+  resolved.value = '';
+
+  if (!raw) { preview.style.display = 'none'; return; }
+
+  // URL directa (ya resuelta, o no es de Flickr): pasar tal cual.
+  if (isDirectImageUrl(raw)) {
+    img.src = raw;
+    img.style.display = 'block';
+    preview.style.display = 'block';
+    status.textContent = '✓ URL directa';
+    resolved.value = raw;
+    return;
+  }
+
+  const photoId = extractFlickrPhotoId(raw);
+  if (!photoId) {
+    preview.style.display = 'block';
+    img.style.display = 'none';
+    status.textContent = '⚠️ URL no reconocida (debe ser Flickr o imagen directa .jpg/.png)';
+    return;
+  }
+
+  preview.style.display = 'block';
+  img.style.display = 'none';
+  status.textContent = '⏳ Resolviendo Flickr...';
+
+  try {
+    const picked = await fetchFlickrSize(photoId, ['Small 400', 'Small 320', 'Medium 640']);
+    img.src = picked.source;
+    img.style.display = 'block';
+    status.textContent = `✓ ${picked.label} · ${picked.width}×${picked.height}px`;
+    resolved.value = picked.source;
+  } catch(e) {
+    status.textContent = '❌ ' + e.message;
   }
 }
 
@@ -1633,6 +1864,10 @@ function showApp(user, adminName) {
   loadFestivals().then(() => syncPlayersFestivalIndicator());
   loadPosts();
   loadPlayersCatalog();
+  // Badges se cargan también al login: se usan en render del feed (chipcounts)
+  // y en leaderboard/catálogo, así que no podemos deferir a switchView('players').
+  loadBadgesCatalog();
+  loadPlayerBadges();
   setupMentionAutocomplete();
   initPlayerSearchForm();
   initChipcountsPicker();
@@ -1756,22 +1991,21 @@ function renderPostChipcounts(post) {
   const list = Array.isArray(post.extra?.chipcounts) ? post.extra.chipcounts : [];
   if (list.length === 0) return '';
   const sorted = [...list].sort((a, b) => (b.chip_count || 0) - (a.chip_count || 0));
-  const MEDALS = ['🥇', '🥈', '🥉'];
-  const rows = sorted.map((c, i) => {
-    const pos = i + 1;
-    const medal = pos <= 3 ? MEDALS[pos - 1] : null;
+  const rows = sorted.map(c => {
     const p = playersCatalog.find(x => x.id === c.player_id);
     const name = p?.full_name;
     const avatar = p?.photo_url
       ? `<img src="${escapeAttr(p.photo_url)}" alt="">`
       : initialsOf(p?.full_name || '?');
-    const flag = p?.nationality_iso ? `<span class="player-flag">${p.nationality_iso}</span>` : '';
+    const flag = isoFlagEmoji(p?.nationality_iso);
+    // 1 badge máx (top por created_at ASC — orden ya aplicado en loadPlayerBadges).
+    // La fila es estrecha; el resto de badges se ve en catálogo/leaderboard.
+    const badge = p ? renderPlayerBadges(p.id, { max: 1 }) : '';
     const nameHtml = name
-      ? `${escapeHtml(name)} ${flag}`
+      ? `${escapeHtml(name)}${flag ? ` <span class="flag-emoji">${flag}</span>` : ''}${badge ? ` <span class="post-chipcounts-badge">${badge}</span>` : ''}`
       : `<span class="post-chipcounts-missing">jugador eliminado</span>`;
     return `
       <div class="post-chipcounts-row">
-        <div class="post-chipcounts-pos ${medal ? 'medal' : ''}">${medal || '#' + pos}</div>
         <div class="post-chipcounts-avatar">${avatar}</div>
         <div class="post-chipcounts-name">${nameHtml}</div>
         <div class="post-chipcounts-chips">${formatChips(c.chip_count || 0)}</div>
@@ -2090,6 +2324,15 @@ let selectedCatalogPlayer = null;  // jugador elegido en el form "Añadir al fes
 let editingPlayerId = null;        // jugador del catálogo abierto en el modal de edición
 let playersRealtimeChannel = null;
 
+// ── BADGES (catálogo reutilizable + asignaciones) ────────────
+// badgesCatalog: lista completa, fuente del autocompletado.
+// playerBadgesMap: player_id → [badge] ordenados por assignment.created_at ASC.
+// BADGE_COLORS: paleta predefinida para creación inline (misma idea que CATEGORIES).
+let badgesCatalog = [];
+let playerBadgesMap = new Map();
+const BADGE_COLORS = ['#C9A84C', '#3dba6e', '#e05252', '#7ec0ff', '#c0a6ff', '#f0852a'];
+let badgeDraftColor = BADGE_COLORS[0];
+
 // ── SWITCH VIEW ──────────────────────────────────────────────
 function switchView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -2100,6 +2343,8 @@ function switchView(name) {
   if (name === 'players') {
     syncPlayersFestivalIndicator();
     loadPlayersCatalog();
+    loadBadgesCatalog();
+    loadPlayerBadges();
     loadFestivalPlayers();
     subscribeFestivalPlayersRealtime();
   } else {
@@ -2125,6 +2370,194 @@ async function loadPlayersCatalog() {
   if (playersView === 'catalog') renderCatalogList();
 }
 
+// ── BADGES: carga y helpers ─────────────────────────────────
+async function loadBadgesCatalog() {
+  const { data, error } = await sb.from('player_badges').select('*').order('label');
+  if (error) { console.warn('loadBadgesCatalog', error); return; }
+  badgesCatalog = data || [];
+}
+
+// Carga todas las asignaciones badge<->player. El join sobre player_badges
+// trae color/label embebidos; la ordenación por created_at ASC fija un
+// orden estable (primer badge asignado = primero en la lista, útil para
+// el "top 1 badge" que se pinta en chipcounts).
+async function loadPlayerBadges() {
+  const { data, error } = await sb
+    .from('player_badge_assignments')
+    .select('player_id, badge_id, created_at, player_badges(id, label, color)')
+    .order('created_at', { ascending: true });
+  if (error) { console.warn('loadPlayerBadges', error); return; }
+  const map = new Map();
+  (data || []).forEach(r => {
+    if (!r.player_badges) return;
+    const list = map.get(r.player_id) || [];
+    list.push(r.player_badges);
+    map.set(r.player_id, list);
+  });
+  playerBadgesMap = map;
+}
+
+// Convierte '#RRGGBB' a 'rgba(r,g,b,a)'. Fallback al oro corporativo si
+// el hex es inválido (las policies SQL ya garantizan el formato, pero no
+// gastamos nada en estar a la defensiva).
+function hexToRgba(hex, a) {
+  const m = (hex || '').match(/^#([0-9a-fA-F]{6})$/);
+  if (!m) return `rgba(201,168,76,${a})`;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function renderBadgePill(b, opts = {}) {
+  const { removable = false, playerId = null } = opts;
+  const bg = hexToRgba(b.color, .15);
+  const bd = hexToRgba(b.color, .35);
+  const x = removable && playerId
+    ? ` <span class="badge-pill-x" onclick="removeBadgeFromPlayer('${playerId}','${b.id}')">✕</span>`
+    : '';
+  return `<span class="badge-pill" style="background:${bg};border-color:${bd};color:${b.color};">${escapeHtml(b.label)}${x}</span>`;
+}
+
+function renderPlayerBadges(playerId, { max = null, removable = false } = {}) {
+  const list = playerBadgesMap.get(playerId) || [];
+  const shown = max != null ? list.slice(0, max) : list;
+  if (shown.length === 0) return '';
+  return shown.map(b => renderBadgePill(b, { removable, playerId })).join('');
+}
+
+// ── BADGES: sección del modal de edición ─────────────────────
+function renderBadgesSectionInModal() {
+  const playerId = editingPlayerId;
+  const container = document.getElementById('pe-badges-assigned');
+  if (!container || !playerId) return;
+  const html = renderPlayerBadges(playerId, { removable: true });
+  container.innerHTML = html || `<span class="badges-empty">— Sin badges —</span>`;
+}
+
+// Reconstruye el dropdown del picker: opciones filtradas por el texto del
+// input y, si no hay match exacto, una opción "+ Crear" con el selector
+// de color. Se invoca también en oninput/onfocus; está diseñada para ser
+// idempotente (se puede llamar de nuevo tras cualquier cambio de estado).
+function handleBadgeInput() {
+  const input = document.getElementById('pe-badge-input');
+  const drop  = document.getElementById('pe-badge-dropdown');
+  if (!input || !drop || !editingPlayerId) return;
+  const qRaw = input.value.trim();
+  const q = qRaw.toLowerCase();
+
+  const assignedIds = new Set((playerBadgesMap.get(editingPlayerId) || []).map(b => b.id));
+  const matches = badgesCatalog.filter(b => {
+    if (assignedIds.has(b.id)) return false;
+    if (!q) return true;
+    return b.label.toLowerCase().includes(q);
+  }).slice(0, 10);
+
+  const exact = badgesCatalog.find(b => b.label.toLowerCase() === q);
+
+  let html = matches.map(b => `
+    <div class="badge-option" onmousedown="event.preventDefault(); assignBadgeToPlayer('${b.id}');">
+      <span class="badge-option-dot" style="background:${b.color};"></span>
+      ${escapeHtml(b.label)}
+    </div>`).join('');
+
+  if (qRaw && !exact) {
+    const swatches = BADGE_COLORS.map(c => `
+      <div class="badge-color-swatch${c === badgeDraftColor ? ' selected' : ''}"
+           style="background:${c};"
+           onmousedown="event.preventDefault(); setBadgeDraftColor('${c}');"
+           title="${c}"></div>`).join('');
+    html += `
+      <div class="badge-option badge-option-create">
+        <div class="badge-create-btn" onmousedown="event.preventDefault(); createAndAssignBadge();">
+          + Crear «${escapeHtml(qRaw)}»
+        </div>
+        <div class="badge-color-picker">
+          <span class="badge-color-picker-label">Color:</span>
+          ${swatches}
+        </div>
+      </div>`;
+  }
+
+  if (!html) {
+    html = `<div class="badge-option" style="color:var(--muted);cursor:default;">— Todos los badges ya asignados —</div>`;
+  }
+
+  drop.innerHTML = html;
+  drop.classList.add('show');
+}
+
+function hideBadgeDropdown() {
+  // Delay para dar tiempo a un onmousedown en el dropdown (que ejecuta
+  // event.preventDefault() para evitar que el blur cancele el click).
+  setTimeout(() => {
+    const drop = document.getElementById('pe-badge-dropdown');
+    if (drop) drop.classList.remove('show');
+  }, 150);
+}
+
+function setBadgeDraftColor(c) {
+  badgeDraftColor = c;
+  handleBadgeInput();  // re-render para destacar la selección
+}
+
+async function assignBadgeToPlayer(badgeId) {
+  if (!editingPlayerId) return;
+  const { error } = await sb.from('player_badge_assignments')
+    .insert({ player_id: editingPlayerId, badge_id: badgeId });
+  if (error) { playerFeedback('pe-feedback', 'Error: ' + error.message, 'err'); return; }
+  await loadPlayerBadges();
+  renderBadgesSectionInModal();
+  const input = document.getElementById('pe-badge-input');
+  if (input) input.value = '';
+  handleBadgeInput();
+  renderCatalogList();
+  renderFestivalPlayers();
+}
+
+async function removeBadgeFromPlayer(playerId, badgeId) {
+  const { error } = await sb.from('player_badge_assignments')
+    .delete()
+    .eq('player_id', playerId)
+    .eq('badge_id', badgeId);
+  if (error) return playerFeedback('pe-feedback', 'Error: ' + error.message, 'err');
+  await loadPlayerBadges();
+  renderBadgesSectionInModal();
+  handleBadgeInput();
+  renderCatalogList();
+  renderFestivalPlayers();
+}
+
+// Crea un badge nuevo con el label del input y el color de borrador, y lo
+// asigna al jugador actual. Recarga badgesCatalog para que el nuevo badge
+// aparezca en el autocompletado de cualquier otro modal (incluido el próximo
+// abrir), sin esperar al realtime.
+async function createAndAssignBadge() {
+  const input = document.getElementById('pe-badge-input');
+  const label = input.value.trim();
+  if (!label || !editingPlayerId) return;
+  const { data, error } = await sb.from('player_badges')
+    .insert({ label, color: badgeDraftColor })
+    .select()
+    .single();
+  if (error) return playerFeedback('pe-feedback', 'Error: ' + error.message, 'err');
+  await loadBadgesCatalog();
+  await assignBadgeToPlayer(data.id);
+  badgeDraftColor = BADGE_COLORS[0];
+}
+
+// Resuelve photo_url para un scope ('pl' alta, 'pe' edición). Siempre dispara
+// previewFlickrPlayer para cubrir el caso "usuario pega y pulsa Guardar sin
+// blur". Retorna { ok: true, url } o { ok: false, reason } si la URL era
+// reconocible como Flickr pero falló la resolución.
+async function resolvePlayerPhoto(scope) {
+  const rawEl = document.getElementById(`${scope}-photo`);
+  const raw = rawEl.value.trim();
+  if (!raw) return { ok: true, url: null };
+  await previewFlickrPlayer(scope);
+  const resolved = document.getElementById(`${scope}-photo-resolved`).value.trim();
+  if (resolved) return { ok: true, url: resolved };
+  return { ok: false, reason: 'No se pudo resolver la URL de la foto. Revisa el preview.' };
+}
+
 async function createPlayerFromForm() {
   const full_name       = document.getElementById('pl-full-name').value.trim();
   const nickname        = document.getElementById('pl-nickname').value.trim() || null;
@@ -2132,22 +2565,26 @@ async function createPlayerFromForm() {
   const nationality_iso = natRaw || null;
   const rankRaw         = document.getElementById('pl-rank').value.trim();
   const vpt_ranking     = rankRaw ? parseInt(rankRaw, 10) : null;
-  const photo_url       = document.getElementById('pl-photo').value.trim() || null;
 
   if (!full_name) return playerFeedback('pl-create-feedback', 'Falta el nombre completo', 'err');
   if (nationality_iso && !/^[A-Z]{2}$/.test(nationality_iso)) {
     return playerFeedback('pl-create-feedback', 'Nacionalidad: ISO 2 letras (ej. ES, US)', 'err');
   }
 
+  const photo = await resolvePlayerPhoto('pl');
+  if (!photo.ok) return playerFeedback('pl-create-feedback', photo.reason, 'err');
+
   const { error } = await sb.from('players').insert({
-    full_name, nickname, nationality_iso, vpt_ranking, photo_url,
+    full_name, nickname, nationality_iso, vpt_ranking, photo_url: photo.url,
   });
   if (error) return playerFeedback('pl-create-feedback', 'Error: ' + error.message, 'err');
 
   playerFeedback('pl-create-feedback', '✓ Añadido al catálogo', 'ok');
-  ['pl-full-name','pl-nickname','pl-nat','pl-rank','pl-photo'].forEach(id => {
-    document.getElementById(id).value = '';
+  ['pl-full-name','pl-nickname','pl-nat','pl-rank','pl-photo','pl-photo-resolved'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
   });
+  const prev = document.getElementById('pl-photo-preview');
+  if (prev) prev.style.display = 'none';
   loadPlayersCatalog();
 }
 
@@ -2337,6 +2774,7 @@ function buildCatalogRow(p) {
   const avatar = p.photo_url
     ? `<img src="${escapeAttr(p.photo_url)}" alt="">`
     : initialsOf(p.full_name);
+  const badges = renderPlayerBadges(p.id);
   row.innerHTML = `
     <div class="player-avatar">${avatar}</div>
     <div class="player-main">
@@ -2345,6 +2783,7 @@ function buildCatalogRow(p) {
         ${p.nationality_iso ? `<span class="player-flag">${p.nationality_iso}</span>` : ''}
         ${p.vpt_ranking ? `<span class="player-rank">#${p.vpt_ranking} VPT</span>` : ''}
       </div>
+      ${badges ? `<div class="player-badges">${badges}</div>` : ''}
     </div>
     <div class="actions-cell">
       <button class="btn-mini" onclick="openPlayerEditModal('${p.id}')">EDITAR</button>
@@ -2362,6 +2801,17 @@ function openPlayerEditModal(playerId) {
   document.getElementById('pe-nat').value       = p.nationality_iso || '';
   document.getElementById('pe-rank').value      = p.vpt_ranking ?? '';
   document.getElementById('pe-photo').value     = p.photo_url || '';
+  // Pre-cargar preview de la foto actual. Si ya es URL directa el helper
+  // marca como ✓ al instante; si es URL de Flickr la resuelve al vuelo.
+  document.getElementById('pe-photo-resolved').value = '';
+  previewFlickrPlayer('pe');
+  // Sección badges: asignados + picker limpio. El badgeDraftColor se resetea
+  // al oro por jugador para que la paleta quede en un estado conocido.
+  document.getElementById('pe-badge-input').value = '';
+  badgeDraftColor = BADGE_COLORS[0];
+  renderBadgesSectionInModal();
+  const drop = document.getElementById('pe-badge-dropdown');
+  if (drop) drop.classList.remove('show');
   const fb = document.getElementById('pe-feedback');
   if (fb) fb.style.display = 'none';
   document.getElementById('player-edit-modal').style.display = 'flex';
@@ -2371,6 +2821,14 @@ function openPlayerEditModal(playerId) {
 function closePlayerEditModal() {
   editingPlayerId = null;
   document.getElementById('player-edit-modal').style.display = 'none';
+  const prev = document.getElementById('pe-photo-preview');
+  if (prev) prev.style.display = 'none';
+  const resolved = document.getElementById('pe-photo-resolved');
+  if (resolved) resolved.value = '';
+  const drop = document.getElementById('pe-badge-dropdown');
+  if (drop) drop.classList.remove('show');
+  const badgeInput = document.getElementById('pe-badge-input');
+  if (badgeInput) badgeInput.value = '';
 }
 
 function handleModalBackdropClick(e) {
@@ -2386,12 +2844,15 @@ async function savePlayerEdit() {
   const nationality_iso = natRaw || null;
   const rankRaw   = document.getElementById('pe-rank').value.trim();
   const vpt_ranking = rankRaw ? parseInt(rankRaw, 10) : null;
-  const photo_url = document.getElementById('pe-photo').value.trim() || null;
 
   if (!full_name) return playerFeedback('pe-feedback', 'Falta el nombre completo', 'err');
   if (nationality_iso && !/^[A-Z]{2}$/.test(nationality_iso)) {
     return playerFeedback('pe-feedback', 'Nacionalidad: ISO 2 letras (ej. ES)', 'err');
   }
+
+  const photo = await resolvePlayerPhoto('pe');
+  if (!photo.ok) return playerFeedback('pe-feedback', photo.reason, 'err');
+  const photo_url = photo.url;
 
   const { error } = await sb.from('players')
     .update({ full_name, nickname, nationality_iso, vpt_ranking, photo_url })
@@ -2479,6 +2940,7 @@ function buildPlayerRow(r) {
     ? ''
     : `<span class="chip-delta ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'} ${formatChips(Math.abs(delta))}</span>`;
 
+  const badges = renderPlayerBadges(r.player_id);
   row.innerHTML = `
     <div class="player-pos ${r.status === 'eliminated' ? 'dim' : ''}">${r.position ?? '—'}</div>
     <div class="player-avatar">${avatar}</div>
@@ -2489,6 +2951,7 @@ function buildPlayerRow(r) {
         ${r.vpt_ranking ? `<span class="player-rank">#${r.vpt_ranking} VPT</span>` : ''}
         ${r.seat_info ? `<span>· ${escapeHtml(r.seat_info)}</span>` : ''}
       </div>
+      ${badges ? `<div class="player-badges">${badges}</div>` : ''}
     </div>
     <div class="chip-cell">
       <div class="chip-value" title="Click para editar">${formatChips(r.chip_count)}</div>
@@ -2562,15 +3025,37 @@ async function removeFromFestival(festivalPlayerId) {
   loadFestivalPlayers();
 }
 
-// ── REALTIME: cambios en festival_players ────────────────────
+// ── REALTIME: cambios en festival_players + badges ───────────
+// Un solo canal para la vista "Jugadores": festival_players (filtrado por
+// festival), + player_badges y player_badge_assignments (globales: un badge
+// nuevo o reasignación debe reflejarse inmediatamente en cualquier jugador).
 function subscribeFestivalPlayersRealtime() {
   unsubscribeFestivalPlayersRealtime();
   const fid = document.getElementById('sel-festival').value;
   if (!fid) return;
-  playersRealtimeChannel = sb.channel('festival_players:' + fid)
+
+  const reloadBadges = async () => {
+    await Promise.all([loadBadgesCatalog(), loadPlayerBadges()]);
+    if (playersView === 'catalog') renderCatalogList();
+    else renderFestivalPlayers();
+    // Si el modal está abierto, refrescar la sección badges
+    const modalOpen = document.getElementById('player-edit-modal').style.display === 'flex';
+    if (modalOpen && editingPlayerId) {
+      renderBadgesSectionInModal();
+      handleBadgeInput();
+    }
+  };
+
+  playersRealtimeChannel = sb.channel('players-view:' + fid)
     .on('postgres_changes',
         { event: '*', schema: 'public', table: 'festival_players', filter: `festival_id=eq.${fid}` },
         () => loadFestivalPlayers())
+    .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'player_badges' },
+        reloadBadges)
+    .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'player_badge_assignments' },
+        reloadBadges)
     .subscribe();
 }
 
@@ -2737,6 +3222,15 @@ function renderFlags(text) {
     return String.fromCodePoint(A_INDICATOR + cc.charCodeAt(0) - A_CODE) +
            String.fromCodePoint(A_INDICATOR + cc.charCodeAt(1) - A_CODE);
   });
+}
+
+// Convierte un ISO-2 ("ES") en el emoji bandera correspondiente.
+// Útil para pintar la nacionalidad del catálogo de jugadores (donde se guarda
+// el código pelado, sin los ':') en los mismos sitios donde `renderFlags`
+// gestiona el patrón ':XX:' dentro de texto libre.
+function isoFlagEmoji(iso) {
+  if (!iso || !/^[A-Z]{2}$/.test(iso)) return '';
+  return renderFlags(':' + iso + ':');
 }
 
 // Render body del feed con menciones como chip dorado.
@@ -2914,11 +3408,11 @@ function renderChipcountsList() {
     const avatar = p?.photo_url
       ? `<img src="${escapeAttr(p.photo_url)}" alt="">`
       : initialsOf(p?.full_name || '?');
-    const flag = p?.nationality_iso ? `<span class="player-flag">${p.nationality_iso}</span>` : '';
+    const flag = isoFlagEmoji(p?.nationality_iso);
     return `
       <div class="chipcount-row" data-id="${c.player_id}">
         <div class="chipcount-avatar">${avatar}</div>
-        <div class="chipcount-name">${escapeHtml(name)} ${flag}</div>
+        <div class="chipcount-name">${escapeHtml(name)}${flag ? ` <span class="flag-emoji">${flag}</span>` : ''}</div>
         <input class="chipcount-input" type="text" value="${formatChips(c.chip_count)}"
                data-id="${c.player_id}" />
         <button class="chipcount-remove" title="Quitar" data-id="${c.player_id}">✕</button>
