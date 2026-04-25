@@ -56,15 +56,28 @@ foreach ($r in $ranks.Keys) {
   }
 }
 
-# Dorso: pill con borde dorado VPT y "V" central. Fondo dorado muy
-# claro (alpha 30/256 ≈ 12%) como diferenciador visual sutil.
-$back = @"
+# Vx: dorso VPT (carta boca abajo). Pill con borde dorado y "V"
+# central. Fondo dorado muy claro (alpha 30/256 ≈ 12%) como
+# diferenciador visual sutil.
+$vback = @"
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40">
 <rect x="1" y="1" width="58" height="38" rx="20" fill="#C9A84C30" stroke="#C9A84C" stroke-width="2"/>
 <text x="30" y="28" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#C9A84C" text-anchor="middle">V</text>
 </svg>
 "@
-[System.IO.File]::WriteAllText((Join-Path $out 'card-Xx.svg'), $back, $utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $out 'card-Vx.svg'), $vback, $utf8NoBom)
+$count++
+
+# Xx: carta desconocida / cualquier carta. Pill blanca como las
+# cartas normales pero con X gris central — placeholder para
+# rangos de mano, "alguna carta", flop sin revelar, etc.
+$xunknown = @"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40">
+<rect x="1" y="1" width="58" height="38" rx="20" fill="#ffffff" stroke="#999" stroke-width="2"/>
+<text x="30" y="28" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#666" text-anchor="middle">X</text>
+</svg>
+"@
+[System.IO.File]::WriteAllText((Join-Path $out 'card-Xx.svg'), $xunknown, $utf8NoBom)
 $count++
 
 Write-Output ("OK: {0} SVGs generados en {1}" -f $count, $out)

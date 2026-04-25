@@ -3420,7 +3420,8 @@ function isoFlagEmoji(iso) {
 // Acepta:
 //   - [As]    → 1 carta
 //   - [AsKh]  → 2 cartas pegadas en un mismo bracket (cualquier nº par)
-//   - [Xx]    → carta tapada/desconocida (standalone, no se mezcla)
+//   - [Xx]    → carta desconocida / cualquier carta (placeholder X gris)
+//   - [Vx]    → carta tapada / dorso VPT (boca abajo, V dorada)
 // Rangos válidos: 2 3 4 5 6 7 8 9 T J Q K A   (T se renderiza como "10")
 // Palos:          s h d c (siempre minúscula)
 // El regex es estricto: [as], [AS], [aS] o [Hello] no matchean.
@@ -3431,10 +3432,11 @@ function isoFlagEmoji(iso) {
 // sigue encontrándolos.
 function renderCards(html) {
   return html.replace(
-    /\[((?:[2-9TJQKA][shdc])+|Xx)\]/g,
+    /\[((?:[2-9TJQKA][shdc])+|Xx|Vx)\]/g,
     (_, content) => {
-      if (content === 'Xx') {
-        return `<img src="assets/cards/card-Xx.svg" alt="?" class="card-img" loading="lazy">`;
+      if (content === 'Xx' || content === 'Vx') {
+        const alt = content === 'Vx' ? 'V' : '?';
+        return `<img src="assets/cards/card-${content}.svg" alt="${alt}" class="card-img" loading="lazy">`;
       }
       let out = '';
       for (let i = 0; i < content.length; i += 2) {
