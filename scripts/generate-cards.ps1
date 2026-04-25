@@ -59,18 +59,16 @@ foreach ($r in $ranks.Keys) {
   foreach ($s in $suits.Keys) {
     $color = $suits[$s].color
     $shape = $suits[$s].shape
-    # Composición: <text> rango anclado en x=20, <g> con shape SVG
-    # del palo translado a (40, 22). y=22 alinea el centro óptico
-    # del palo con el centro óptico de la letra del rango (que vive
-    # entre y=12 y y=28 con su baseline en y=28). Las shapes ya
-    # vienen pre-escaladas a bbox ~18×18 en sus coordenadas (ver
-    # $suits) — no usamos transform="scale(...)" porque flutter_svg
-    # lo descarta en algunas combinaciones.
+    # Composición invertida: pill rellena con el color del palo (sin
+    # stroke), rango y palo en BLANCO encima. Mayor contraste visual
+    # y reconocimiento del palo a primera vista por el color de fondo.
+    # El palo (shape) usa fill="#ffffff" del <g>; las shapes ya vienen
+    # pre-escaladas a bbox ~18×18 en sus coordenadas (ver $suits).
     $svg = @"
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40">
-<rect x="1" y="1" width="58" height="38" rx="20" fill="#ffffff" stroke="#999" stroke-width="2"/>
-<text x="20" y="28" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="$color" text-anchor="middle">$label</text>
-<g transform="translate(40,22)" fill="$color">$shape</g>
+<rect x="1" y="1" width="58" height="38" rx="20" fill="$color"/>
+<text x="20" y="28" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#ffffff" text-anchor="middle">$label</text>
+<g transform="translate(40,22)" fill="#ffffff">$shape</g>
 </svg>
 "@
     $path = Join-Path $out "card-$r$s.svg"
@@ -84,8 +82,8 @@ foreach ($r in $ranks.Keys) {
 # diferenciador visual sutil.
 $vback = @"
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40">
-<rect x="1" y="1" width="58" height="38" rx="20" fill="#C9A84C30" stroke="#C9A84C" stroke-width="2"/>
-<text x="30" y="28" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#C9A84C" text-anchor="middle">V</text>
+<rect x="1" y="1" width="58" height="38" rx="20" fill="#C9A84C"/>
+<text x="30" y="28" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#ffffff" text-anchor="middle">V</text>
 </svg>
 "@
 [System.IO.File]::WriteAllText((Join-Path $out 'card-Vx.svg'), $vback, $utf8NoBom)
