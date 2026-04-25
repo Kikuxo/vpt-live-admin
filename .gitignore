@@ -4,6 +4,7 @@ _serve.ps1
 # Editores / IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

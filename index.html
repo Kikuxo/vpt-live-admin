@@ -497,6 +497,16 @@
     line-height: 1.55;
   }
 
+  /* Cartas de poker inline en title/body. Renderizadas por renderCards
+     (sintaxis [As], [AsKh], [Xx]). Altura 20px, ratio 5:7. */
+  .card-img {
+    height: 20px;
+    width: auto;
+    vertical-align: middle;
+    margin: 0 1px;
+    display: inline-block;
+  }
+
   .post-extra {
     margin-top: 10px;
     padding: 10px 12px;
@@ -2133,8 +2143,8 @@ function buildPostCard(post) {
       <button class="post-delete" onclick="deletePost('${post.id}', this)" title="Eliminar">✕</button>
     </div>
     <div class="post-body">
-      ${post.title ? `<div class="post-title-text">${renderFlags(escapeHtml(post.title))}</div>` : ''}
-      ${post.body ? `<div class="post-body-text">${renderFlags(renderBodyWithMentions(post.body))}</div>` : ''}
+      ${post.title ? `<div class="post-title-text">${renderTitle(post.title)}</div>` : ''}
+      ${post.body ? `<div class="post-body-text">${renderBody(post.body)}</div>` : ''}
       ${extra && Object.keys(extra).length > 0 ? (() => {
         // Orden fijo: Torneo → Nivel → Ciegas → Jugadores → Media
         // extra.Ciegas con fallback a extra.Blinds por posts antiguos aún no migrados
@@ -3406,24 +3416,64 @@ function isoFlagEmoji(iso) {
   return renderFlags(':' + iso + ':');
 }
 
-// Render body del feed con menciones como chip dorado.
-// Dos pasadas: busca menciones en el body CRUDO (mismo patrón que usa
-// extractMentionedPlayerIds, así ambos se comportan igual), y escapa los
-// segmentos de texto normal alrededor. Evita cualquier interacción rara
-// entre escapeHtml y el regex, y mantiene XSS cubierto.
-function renderBodyWithMentions(body) {
+// Sustituye códigos de carta de poker por imágenes SVG.
+// Acepta:
+//   - [As]    → 1 carta
+//   - [AsKh]  → 2 cartas pegadas en un mismo bracket (cualquier nº par)
+//   - [Xx]    → carta tapada/desconocida (standalone, no se mezcla)
+// Rangos válidos: 2 3 4 5 6 7 8 9 T J Q K A   (T se renderiza como "10")
+// Palos:          s h d c (siempre minúscula)
+// El regex es estricto: [as], [AS], [aS] o [Hello] no matchean.
+//
+// Importante: este helper opera sobre HTML ya escapado (entre menciones
+// renderizadas como spans). Los corchetes `[` `]` no son caracteres
+// HTML especiales, así que no se transforman al escapar y el regex
+// sigue encontrándolos.
+function renderCards(html) {
+  return html.replace(
+    /\[((?:[2-9TJQKA][shdc])+|Xx)\]/g,
+    (_, content) => {
+      if (content === 'Xx') {
+        return `<img src="assets/cards/card-Xx.svg" alt="?" class="card-img" loading="lazy">`;
+      }
+      let out = '';
+      for (let i = 0; i < content.length; i += 2) {
+        const c = content.substring(i, i + 2);
+        out += `<img src="assets/cards/card-${c}.svg" alt="${c}" class="card-img" loading="lazy">`;
+      }
+      return out;
+    }
+  );
+}
+
+// Render body del feed: pasada única que combina menciones, escape,
+// banderas y cartas. Las menciones se procesan PRIMERO en el texto
+// crudo y se reemplazan por <span class="mention-chip">. Solo los
+// segmentos plain entre menciones pasan por escapeHtml + renderFlags
+// + renderCards, así garantizamos que un nombre de jugador con
+// caracteres tipo `[Ace]` no dispare el regex de cartas dentro del
+// chip dorado.
+function renderBody(body) {
   if (!body) return '';
   const re = /@\[([^\]]+)\]\(([0-9a-fA-F-]{36})\)/g;
+  const enrich = (seg) => renderCards(renderFlags(escapeHtml(seg)));
   let out = '';
   let last = 0;
   let m;
   while ((m = re.exec(body)) !== null) {
-    if (m.index > last) out += escapeHtml(body.slice(last, m.index));
+    if (m.index > last) out += enrich(body.slice(last, m.index));
     out += `<span class="mention-chip">@${escapeHtml(m[1])}</span>`;
     last = m.index + m[0].length;
   }
-  if (last < body.length) out += escapeHtml(body.slice(last));
+  if (last < body.length) out += enrich(body.slice(last));
   return out;
+}
+
+// Title: sin menciones (jerarquía title vs body). Solo escape +
+// banderas + cartas.
+function renderTitle(title) {
+  if (!title) return '';
+  return renderCards(renderFlags(escapeHtml(title)));
 }
 
 // ── STICKY FIELDS (localStorage) ─────────────────────────────
