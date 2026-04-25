@@ -391,6 +391,43 @@
     font-family: 'DM Mono', monospace;
   }
 
+  /* Indicador de estado del WebSocket de live_updates. Tres estados
+     gobernados por data-status (connecting / subscribed / error).
+     El polling backup de 5min siempre corre, así que si el dot es
+     amarillo o rojo el feed sigue actualizándose (más lento). */
+  .feed-realtime {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  .feed-realtime .rt-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .feed-realtime[data-status="subscribed"]   { color: #4CAF50; }
+  .feed-realtime[data-status="subscribed"]   .rt-dot { background: #4CAF50; }
+  .feed-realtime[data-status="connecting"]   { color: #C9A84C; }
+  .feed-realtime[data-status="connecting"]   .rt-dot { background: #C9A84C; }
+  .feed-realtime[data-status="error"]        { color: #e05252; }
+  .feed-realtime[data-status="error"]        .rt-dot { background: #e05252; }
+
+  /* Highlight oro fade-out 1s para posts recién llegados por
+     realtime. La clase .post-new se añade SOLO a posts cuyo id no
+     estaba en knownPostIds antes (no a la primera carga del feed). */
+  @keyframes goldFade {
+    from { background: rgba(201, 168, 76, 0.18); }
+    to   { background: transparent; }
+  }
+  .post-new {
+    animation: goldFade 1s ease-out;
+  }
+
   .feed-filter {
     margin-left: auto;
     display: flex;
@@ -1646,6 +1683,9 @@
       <div class="feed-header">
         <div class="feed-title">Feed en vivo</div>
         <div class="feed-count" id="feed-count">0 posts</div>
+        <div class="feed-realtime" id="feed-realtime" data-status="connecting" title="Estado de la conexión en tiempo real">
+          <span class="rt-dot"></span><span class="rt-label">Conectando...</span>
+        </div>
         <div class="feed-filter">
           <button class="filter-btn active" onclick="setFilter('all', this)">Todos</button>
           <button class="filter-btn" onclick="setFilter('festival', this)">Este festival</button>
@@ -1823,6 +1863,19 @@ const CATEGORIES = [
 let selectedCat = null;
 let currentFilter = 'all';
 let allPosts = [];
+// IDs de posts que ya hemos visto al menos una vez. Cualquier post
+// cuyo id NO esté aquí cuando renderPosts los pinta es "nuevo" y
+// recibe la clase .post-new (animación goldFade 1s). La primera
+// carga marca todos como conocidos sin animar.
+let knownPostIds = new Set();
+// Canal realtime del feed (live_updates). Recreado en showApp y
+// onFestivalChange (cuando el filtro 'festival' está activo).
+let feedRealtimeChannel = null;
+// Timestamp ISO del último evento postgres_changes recibido. Usado
+// para resincronizar tras reconexiones silenciosas: en cada
+// SUBSCRIBED, si !=null pedimos eventos posteriores; si ==null es
+// first-load y hacemos loadPosts() normal.
+let lastFeedEventAt = null;
 let festivals = [];
 let refreshInterval = null;
 let editingPostId = null;  // null = modo nuevo; UUID = modo edición
@@ -2032,6 +2085,7 @@ async function logout() {
   await sb.auth.signOut();
   clearInterval(refreshInterval);
   unsubscribeFestivalPlayersRealtime();
+  unsubscribeFeedRealtime();
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -2053,6 +2107,9 @@ function showApp(user, adminName) {
     subscribeFestivalVideosRealtime();
   });
   loadPosts();
+  // Realtime del feed: WebSocket sobre live_updates. El indicador
+  // "EN DIRECTO" del feed-header refleja el estado del canal.
+  subscribeFeedRealtime();
   loadPlayersCatalog();
   // Badges se cargan también al login: se usan en render del feed (chipcounts)
   // y en leaderboard/catálogo, así que no podemos deferir a switchView('players').
@@ -2062,8 +2119,10 @@ function showApp(user, adminName) {
   initPlayerSearchForm();
   initChipcountsPicker();
   restoreStickyToForm();  // Mejora 3: repoblar Torneo/Nivel/Ciegas/Jugadores/Media desde localStorage
-  // Refresco automático cada 15 segundos
-  refreshInterval = setInterval(loadPosts, 15000);
+  // Polling backup cada 5 min: red de seguridad ante caídas
+  // silenciosas del WebSocket. Si realtime funciona, el fetch no
+  // detecta cambios y es no-op barato.
+  refreshInterval = setInterval(loadPosts, 5 * 60 * 1000);
 }
 
 // ── FESTIVALS ─────────────────────────────────────────────────
@@ -2093,6 +2152,10 @@ function onFestivalChange() {
   // Si la sección está colapsada, el contador igual se actualiza.
   loadFestivalVideos();
   subscribeFestivalVideosRealtime();
+  // Feed realtime: re-suscribir solo si filter='festival' (el canal
+  // filtra por festival_id activo). Si filter='all' el canal escucha
+  // todo y no necesita re-suscripción al cambiar de festival.
+  if (currentFilter === 'festival') subscribeFeedRealtime();
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -2131,7 +2194,19 @@ function renderPosts() {
   }
 
   scroll.innerHTML = '';
-  allPosts.forEach(p => scroll.appendChild(buildPostCard(p)));
+  // Detectamos posts nuevos comparando con knownPostIds (Set actualizado
+  // tras cada render). Solo se animan los que llegan por realtime
+  // — first-load llena el Set sin animar, render subsiguiente animará
+  // únicamente los IDs no vistos.
+  const isFirstLoad = knownPostIds.size === 0;
+  allPosts.forEach(p => {
+    const card = buildPostCard(p);
+    if (!isFirstLoad && !knownPostIds.has(p.id)) {
+      card.classList.add('post-new');
+    }
+    scroll.appendChild(card);
+    knownPostIds.add(p.id);
+  });
 }
 
 function buildPostCard(post) {
@@ -2504,6 +2579,9 @@ function setFilter(filter, btn) {
   document.querySelectorAll('#view-feed .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   loadPosts();
+  // Re-suscribir al canal con el nuevo filter (cambia el server-side
+  // filter de festival_id si pasa de 'all' a 'festival' o viceversa).
+  subscribeFeedRealtime();
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -3898,6 +3976,84 @@ function subscribeFestivalVideosRealtime() {
         { event: '*', schema: 'public', table: 'festival_videos', filter: `festival_id=eq.${fid}` },
         () => loadFestivalVideos())
     .subscribe();
+}
+
+// ── REALTIME: feed (live_updates) ────────────────────────────
+// Pinta el indicador EN DIRECTO según el estado del WebSocket. Tres
+// estados visibles en la UI: subscribed (verde), connecting (oro)
+// y error (rojo). El polling backup de 5min sigue corriendo siempre,
+// así que el feed se mantiene incluso si vemos rojo aquí.
+function setFeedRealtimeStatus(status, label) {
+  const el = document.getElementById('feed-realtime');
+  if (!el) return;
+  el.dataset.status = status;
+  const lbl = el.querySelector('.rt-label');
+  if (lbl) lbl.textContent = label;
+}
+
+// Suscripción al canal de live_updates. Filtramos por festival_id
+// SOLO si el usuario tiene activo el filtro 'festival' (coherente con
+// loadPosts(): si está en 'all' queremos eventos de cualquier festival).
+//
+// Robustez tras reconexión: lastFeedEventAt almacena el timestamp del
+// último evento recibido. En cada SUBSCRIBED:
+//   - Si lastFeedEventAt == null → first-load: loadPosts() normal.
+//   - Si lastFeedEventAt != null → reconectamos tras un periodo
+//     potencialmente largo: hacemos loadPosts() para sincronizar (es
+//     barato y garantiza no perder INSERTs ocurridos durante el outage).
+function subscribeFeedRealtime() {
+  if (feedRealtimeChannel) {
+    try { sb.removeChannel(feedRealtimeChannel); } catch(_) {}
+    feedRealtimeChannel = null;
+  }
+  setFeedRealtimeStatus('connecting', 'Conectando...');
+
+  // Filtro condicional: si el usuario filtra por festival, suscribimos
+  // solo al festival activo. Si está en 'all', recibimos todos los
+  // eventos sin filter (igual que loadPosts() los muestra).
+  const eventConfig = { event: '*', schema: 'public', table: 'live_updates' };
+  if (currentFilter === 'festival') {
+    const fid = document.getElementById('sel-festival').value;
+    if (fid) eventConfig.filter = `festival_id=eq.${fid}`;
+  }
+
+  const channelName = currentFilter === 'festival' && eventConfig.filter
+    ? `live-feed:${document.getElementById('sel-festival').value}`
+    : 'live-feed:all';
+
+  feedRealtimeChannel = sb.channel(channelName)
+    .on('postgres_changes', eventConfig, (payload) => {
+      // Trackeamos timestamp del evento para reconciliación posterior.
+      // Usamos commit_timestamp del payload (provisto por Supabase
+      // realtime) si está; si no, fallback a now().
+      lastFeedEventAt = payload.commit_timestamp || new Date().toISOString();
+      // En INSERT/UPDATE/DELETE recargamos. Es lo más simple y
+      // garantiza consistencia; loadPosts ya pinta sólo lo nuevo.
+      loadPosts();
+    })
+    .subscribe((status) => {
+      // Status posibles del cliente JS:
+      //   SUBSCRIBED, TIMED_OUT, CHANNEL_ERROR, CLOSED
+      if (status === 'SUBSCRIBED') {
+        setFeedRealtimeStatus('subscribed', 'EN DIRECTO');
+        // Si ya hubo eventos antes (es decir, esto es una reconexión,
+        // no la primera conexión), forzamos un loadPosts() para
+        // recuperar lo que hayamos perdido en el outage.
+        if (lastFeedEventAt !== null) loadPosts();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setFeedRealtimeStatus('error', 'Sin conexión');
+      } else if (status === 'CLOSED') {
+        setFeedRealtimeStatus('connecting', 'Conectando...');
+      }
+    });
+}
+
+function unsubscribeFeedRealtime() {
+  if (feedRealtimeChannel) {
+    try { sb.removeChannel(feedRealtimeChannel); } catch(_) {}
+    feedRealtimeChannel = null;
+  }
+  setFeedRealtimeStatus('connecting', 'Conectando...');
 }
 
 // ── CHECK SESSION ─────────────────────────────────────────────
