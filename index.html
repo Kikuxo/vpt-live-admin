@@ -490,6 +490,17 @@
     color: var(--white);
     margin-bottom: 4px;
   }
+  /* Hashtag del torneo: aparece inline tras el title (CamelCase del
+     valor de extra.Torneo). nowrap evita que se parta el hashtag en
+     dos líneas; el wrap del padre permite saltar antes del hashtag
+     si no cabe en la misma línea que el title. */
+  .tournament-hashtag {
+    color: var(--gold);
+    font-weight: 500;
+    font-size: 0.85em;
+    margin-left: 8px;
+    white-space: nowrap;
+  }
 
   .post-body-text {
     font-size: 13px;
@@ -2143,14 +2154,14 @@ function buildPostCard(post) {
       <button class="post-delete" onclick="deletePost('${post.id}', this)" title="Eliminar">✕</button>
     </div>
     <div class="post-body">
-      ${post.title ? `<div class="post-title-text">${renderTitle(post.title)}</div>` : ''}
+      ${(post.title || post.extra?.Torneo) ? `<div class="post-title-text">${renderTitle(post.title || '')}${post.extra?.Torneo ? `<span class="tournament-hashtag">${tournamentHashtag(post.extra.Torneo)}</span>` : ''}</div>` : ''}
       ${post.body ? `<div class="post-body-text">${renderBody(post.body)}</div>` : ''}
       ${extra && Object.keys(extra).length > 0 ? (() => {
-        // Orden fijo: Torneo → Nivel → Ciegas → Jugadores → Media
+        // Orden fijo: Nivel → Ciegas → Jugadores → Media
+        // (Torneo NO va aquí: se renderiza como #hashtag dorado junto al title)
         // extra.Ciegas con fallback a extra.Blinds por posts antiguos aún no migrados
         const ciegasVal = extra.Ciegas ?? extra.Blinds;
         const parts = [
-          extra.Torneo    ? `<div class="extra-stat"><div class="extra-label">Torneo</div><div class="extra-value">${extra.Torneo}</div></div>` : '',
           extra.Nivel     ? `<div class="extra-stat"><div class="extra-label">Nivel</div><div class="extra-value">${extra.Nivel}</div></div>`   : '',
           ciegasVal       ? `<div class="extra-stat"><div class="extra-label">Ciegas</div><div class="extra-value">${ciegasVal}</div></div>`    : '',
           extra.Jugadores ? `<div class="extra-stat"><div class="extra-label">Jugadores</div><div class="extra-value">${extra.Jugadores}</div></div>` : '',
@@ -3476,6 +3487,21 @@ function renderBody(body) {
 function renderTitle(title) {
   if (!title) return '';
   return renderCards(renderFlags(escapeHtml(title)));
+}
+
+// Convierte un nombre de torneo (extra.Torneo) en un hashtag CamelCase
+// sin espacios ni acentos. El admin ve el campo libre como siempre,
+// el render del feed lo presenta como #VPTTrofaDay1 junto al title.
+//   "VPT Trofa Day 1"    -> #VPTTrofaDay1
+//   "Día 4 - Mesa Final" -> #Dia4MesaFinal
+//   "Online Series #3"   -> #OnlineSeries3   (el # del usuario se cae)
+// Devuelve '' si el nombre es null/vacío o solo contiene caracteres
+// no alfanuméricos.
+function tournamentHashtag(name) {
+  if (!name) return '';
+  const stripped = name.normalize('NFKD').replace(/[̀-ͯ]/g, '');
+  const camel = stripped.replace(/[^a-zA-Z0-9]/g, '');
+  return camel ? '#' + camel : '';
 }
 
 // ── STICKY FIELDS (localStorage) ─────────────────────────────
