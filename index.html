@@ -428,6 +428,125 @@
     animation: goldFade 1s ease-out;
   }
 
+  /* ── BUSCADOR + FILTROS DEL FEED ──────────────────────────── */
+  .feed-tools {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .feed-search {
+    position: relative;
+    flex: 1;
+  }
+  .feed-search input {
+    width: 100%;
+    padding: 8px 32px 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--white);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .feed-search input::placeholder { color: var(--muted); }
+  .feed-search input:focus { border-color: var(--gold); }
+  .feed-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    width: 20px; height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    line-height: 1;
+    border-radius: 50%;
+  }
+  .feed-search-clear:hover { color: var(--white); background: var(--border); }
+  .feed-filters-toggle {
+    padding: 8px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .feed-filters-toggle:hover { color: var(--white); border-color: var(--border2); }
+  .feed-filters-toggle.active {
+    color: var(--gold);
+    border-color: rgba(201,168,76,.45);
+    background: rgba(201,168,76,.12);
+  }
+  .feed-filters-toggle .ft-arrow {
+    font-size: 9px;
+    transition: transform .15s;
+  }
+  .feed-filters-panel {
+    display: flex;
+    gap: 12px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .ff-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .ff-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-weight: 600;
+  }
+  .ff-field select {
+    padding: 7px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+  }
+  .ff-field select:focus { border-color: var(--gold); }
+  .feed-results-info {
+    padding: 8px 24px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .feed-results-info.empty {
+    text-align: center;
+    padding: 24px;
+    color: var(--white);
+  }
+  .feed-results-info.empty .ri-sub {
+    display: block;
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
   .feed-filter {
     margin-left: auto;
     display: flex;
@@ -1691,6 +1810,38 @@
           <button class="filter-btn" onclick="setFilter('festival', this)">Este festival</button>
         </div>
       </div>
+      <div class="feed-tools">
+        <div class="feed-search">
+          <input id="feed-search-input" type="text" placeholder="Buscar en el feed..." autocomplete="off" oninput="onSearchInput(this.value)" />
+          <button class="feed-search-clear" id="feed-search-clear" type="button" onclick="clearSearch()" title="Limpiar búsqueda" style="display:none;">✕</button>
+        </div>
+        <button class="feed-filters-toggle" id="feed-filters-toggle" type="button" onclick="toggleFiltersPanel()">
+          <span>⚙ Filtros</span><span class="ft-arrow" id="feed-filters-arrow">▼</span>
+        </button>
+      </div>
+      <div class="feed-filters-panel" id="feed-filters-panel" style="display:none;">
+        <label class="ff-field">
+          <span class="ff-label">Torneo</span>
+          <select id="feed-filter-tournament" onchange="onFilterChange('tournament', this.value)">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label class="ff-field">
+          <span class="ff-label">Categoría</span>
+          <select id="feed-filter-category" onchange="onFilterChange('category', this.value)">
+            <option value="">Todas</option>
+            <option value="info">Información</option>
+            <option value="chipcount">Chipcount</option>
+            <option value="prize">Premios</option>
+            <option value="result">Resultados</option>
+            <option value="elim">Eliminación</option>
+            <option value="announce">Anuncio</option>
+            <option value="levelup">Nuevo Nivel</option>
+            <option value="other">Otro</option>
+          </select>
+        </label>
+      </div>
+      <div class="feed-results-info" id="feed-results-info" style="display:none;"></div>
       <div class="feed-scroll" id="feed-scroll">
         <div class="empty-state" id="empty-state">
           <div class="empty-icon">📡</div>
@@ -1868,6 +2019,13 @@ let allPosts = [];
 // recibe la clase .post-new (animación goldFade 1s). La primera
 // carga marca todos como conocidos sin animar.
 let knownPostIds = new Set();
+// ── Búsqueda + filtros del feed (client-side sobre allPosts) ──
+// searchQuery se almacena ya normalizada (lowercase + sin acentos)
+// para que el filtrado sea barato. tournament/category vacíos = "todos".
+let searchQuery = '';
+let tournamentFilter = '';
+let categoryFilter = '';
+let filtersExpanded = false;
 // Canal realtime del feed (live_updates). Recreado en showApp y
 // onFestivalChange (cuando el filtro 'festival' está activo).
 let feedRealtimeChannel = null;
@@ -2141,6 +2299,12 @@ async function loadFestivals() {
 }
 
 function onFestivalChange() {
+  // Reset búsqueda + filtros + knownPostIds al cambiar de festival.
+  // Así los posts del nuevo festival animan correctamente al entrar
+  // y la lista de torneos del dropdown se reconstruye con los del
+  // nuevo festival.
+  resetFeedFilters();
+  knownPostIds.clear();
   if (currentFilter === 'festival') loadPosts();
   // Si la vista de Jugadores está abierta (o abierta después), refrescar
   syncPlayersFestivalIndicator();
@@ -2174,6 +2338,10 @@ async function loadPosts() {
   const { data } = await query;
   allPosts = data || [];
   renderPosts();
+  // Refrescar el dropdown de Torneos por si llegaron torneos nuevos.
+  // Recalcula opciones y mantiene la selección si sigue válida.
+  renderFiltersPanel();
+  renderResultsInfo();
 }
 
 function renderPosts() {
@@ -2181,6 +2349,7 @@ function renderPosts() {
   const count  = document.getElementById('feed-count');
   if (!scroll || !count) return;  // por si el DOM aún no está montado
 
+  // El contador SIEMPRE muestra el total cargado, no el filtrado.
   count.textContent = `${allPosts.length} post${allPosts.length !== 1 ? 's' : ''}`;
 
   if (allPosts.length === 0) {
@@ -2193,20 +2362,37 @@ function renderPosts() {
     return;
   }
 
-  scroll.innerHTML = '';
+  // Subset filtrado para pintar; allPosts queda intacto.
+  const filtered = getFilteredPosts();
   // Detectamos posts nuevos comparando con knownPostIds (Set actualizado
   // tras cada render). Solo se animan los que llegan por realtime
   // — first-load llena el Set sin animar, render subsiguiente animará
   // únicamente los IDs no vistos.
   const isFirstLoad = knownPostIds.size === 0;
-  allPosts.forEach(p => {
+
+  if (filtered.length === 0) {
+    // allPosts > 0 pero filtros activos descartan todo. El indicador
+    // feed-results-info ya muestra "Sin resultados" — aquí dejamos el
+    // scroll vacío (ningún <article>). NO mostramos el empty-state
+    // por defecto (sería confuso, sugiere "no hay nada en el festival").
+    scroll.innerHTML = '';
+    // Igual registramos los IDs cargados para no animarlos al limpiar
+    // filtros más tarde.
+    allPosts.forEach(p => knownPostIds.add(p.id));
+    return;
+  }
+
+  scroll.innerHTML = '';
+  filtered.forEach(p => {
     const card = buildPostCard(p);
     if (!isFirstLoad && !knownPostIds.has(p.id)) {
       card.classList.add('post-new');
     }
     scroll.appendChild(card);
-    knownPostIds.add(p.id);
   });
+  // Registrar TODOS los IDs cargados (no solo los renderizados) para
+  // que cambiar de filtro no anime los que ya teníamos en allPosts.
+  allPosts.forEach(p => knownPostIds.add(p.id));
 }
 
 function buildPostCard(post) {
@@ -3580,6 +3766,163 @@ function tournamentHashtag(name) {
   const stripped = name.normalize('NFKD').replace(/[̀-ͯ]/g, '');
   const camel = stripped.replace(/[^a-zA-Z0-9]/g, '');
   return camel ? '#' + camel : '';
+}
+
+// ── BUSCADOR + FILTROS DEL FEED ──────────────────────────────
+// Normaliza un texto para búsqueda case- y accent-insensitive.
+// Reusa el mismo patrón NFKD que tournamentHashtag.
+function normalizeForSearch(text) {
+  if (!text) return '';
+  return text.toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+// Sustituye cada mención `@[Nombre](uuid)` por solo el nombre, para
+// que el query "Mateos" matchee aunque venga en formato mención.
+// El UUID NO entra en el texto buscable.
+function flattenMentions(text) {
+  if (!text) return '';
+  return text.replace(/@\[([^\]]+)\]\([0-9a-fA-F-]{36}\)/g, '$1');
+}
+
+// Devuelve la lista única de torneos presentes en allPosts, ordenada
+// alfabéticamente. Recalculada en cada renderFiltersPanel (los posts
+// nuevos por realtime pueden traer torneos no vistos antes).
+function getUniqueTournaments() {
+  const set = new Set();
+  for (const p of allPosts) {
+    const t = p.extra?.Torneo;
+    if (t && typeof t === 'string' && t.trim()) set.add(t.trim());
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+// Aplica búsqueda + filtros sobre allPosts y devuelve el subset
+// que se renderiza. Los 3 filtros son independientes en AND.
+function getFilteredPosts() {
+  if (!searchQuery && !tournamentFilter && !categoryFilter) return allPosts;
+  return allPosts.filter(p => {
+    if (tournamentFilter && p.extra?.Torneo !== tournamentFilter) return false;
+    if (categoryFilter && p.type !== categoryFilter) return false;
+    if (searchQuery) {
+      const haystack = normalizeForSearch(
+        (p.title || '') + ' ' + flattenMentions(p.body || '')
+      );
+      if (!haystack.includes(searchQuery)) return false;
+    }
+    return true;
+  });
+}
+
+// Repobla las opciones del dropdown de Torneo con los únicos
+// presentes en allPosts. Mantiene la selección actual si sigue
+// disponible; si no, vuelve a "Todos".
+function renderFiltersPanel() {
+  const sel = document.getElementById('feed-filter-tournament');
+  if (!sel) return;
+  const tournaments = getUniqueTournaments();
+  const previous = tournamentFilter;
+  // Reset opciones manteniendo "Todos" como primera
+  sel.innerHTML = '<option value="">Todos</option>';
+  for (const t of tournaments) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    sel.appendChild(opt);
+  }
+  // Restaurar selección si sigue siendo válida
+  if (previous && tournaments.includes(previous)) {
+    sel.value = previous;
+  } else {
+    sel.value = '';
+    if (previous && !tournaments.includes(previous)) tournamentFilter = '';
+  }
+}
+
+// Pinta el indicador "X de Y posts" o "Sin resultados" arriba del
+// feed-scroll. Visible solo si hay al menos un filtro activo.
+function renderResultsInfo() {
+  const el = document.getElementById('feed-results-info');
+  if (!el) return;
+  const hasFilter = !!(searchQuery || tournamentFilter || categoryFilter);
+  if (!hasFilter) {
+    el.style.display = 'none';
+    el.classList.remove('empty');
+    el.innerHTML = '';
+    return;
+  }
+  const filtered = getFilteredPosts();
+  if (filtered.length === 0) {
+    el.classList.add('empty');
+    el.innerHTML = `Sin resultados<span class="ri-sub">Limpia los filtros para ver todos los posts</span>`;
+  } else {
+    el.classList.remove('empty');
+    el.textContent = `Mostrando ${filtered.length} de ${allPosts.length} posts`;
+  }
+  el.style.display = 'block';
+}
+
+// Handlers UI
+function onSearchInput(value) {
+  searchQuery = normalizeForSearch(value);
+  // Mostrar/ocultar el botón × según haya texto
+  const clearBtn = document.getElementById('feed-search-clear');
+  if (clearBtn) clearBtn.style.display = value ? 'block' : 'none';
+  renderPosts();
+  renderResultsInfo();
+}
+
+function clearSearch() {
+  const input = document.getElementById('feed-search-input');
+  if (input) input.value = '';
+  searchQuery = '';
+  const clearBtn = document.getElementById('feed-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderPosts();
+  renderResultsInfo();
+}
+
+function toggleFiltersPanel() {
+  filtersExpanded = !filtersExpanded;
+  const panel = document.getElementById('feed-filters-panel');
+  const arrow = document.getElementById('feed-filters-arrow');
+  const toggle = document.getElementById('feed-filters-toggle');
+  if (panel) panel.style.display = filtersExpanded ? 'flex' : 'none';
+  if (arrow) arrow.textContent = filtersExpanded ? '▲' : '▼';
+  if (toggle) toggle.classList.toggle('active', filtersExpanded || !!(tournamentFilter || categoryFilter));
+}
+
+function onFilterChange(kind, value) {
+  if (kind === 'tournament') tournamentFilter = value;
+  else if (kind === 'category') categoryFilter = value;
+  // Refrescar estado visual del botón Filtros (highlight si hay filtro activo)
+  const toggle = document.getElementById('feed-filters-toggle');
+  if (toggle) toggle.classList.toggle('active', filtersExpanded || !!(tournamentFilter || categoryFilter));
+  renderPosts();
+  renderResultsInfo();
+}
+
+// Reset completo: usado al cambiar de festival.
+function resetFeedFilters() {
+  searchQuery = '';
+  tournamentFilter = '';
+  categoryFilter = '';
+  filtersExpanded = false;
+  const input = document.getElementById('feed-search-input');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('feed-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const panel = document.getElementById('feed-filters-panel');
+  if (panel) panel.style.display = 'none';
+  const arrow = document.getElementById('feed-filters-arrow');
+  if (arrow) arrow.textContent = '▼';
+  const toggle = document.getElementById('feed-filters-toggle');
+  if (toggle) toggle.classList.remove('active');
+  const selT = document.getElementById('feed-filter-tournament');
+  if (selT) selT.value = '';
+  const selC = document.getElementById('feed-filter-category');
+  if (selC) selC.value = '';
 }
 
 // ── STICKY FIELDS (localStorage) ─────────────────────────────
