@@ -1816,6 +1816,78 @@
     flex-shrink: 0;
   }
 
+  /* Icono 🌐 para distinguir bans GLOBALES (festival_id IS NULL)
+     de los per-festival en la lista del modal de Baneados. */
+  .ban-global-icon {
+    font-size: 14px;
+    margin-right: 4px;
+    vertical-align: -1px;
+  }
+
+  /* ── BAN PROMPT: mini-modal de razón + checkbox global ────── */
+  .ban-prompt-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 4px 0 0 0;
+  }
+  .ban-prompt-target {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--white);
+  }
+  .ban-prompt-target strong {
+    color: var(--gold);
+  }
+  .ban-prompt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ban-prompt-field > span {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-weight: 600;
+  }
+  .ban-prompt-field input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .ban-prompt-field input[type="text"]:focus {
+    border-color: var(--gold);
+  }
+  .ban-prompt-checkbox {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ban-prompt-checkbox > span {
+    font-size: 13px;
+    color: var(--white);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .ban-prompt-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #f59e0b;
+    cursor: pointer;
+  }
+
   /* ── FESTIVAL: botones de gestión + modal de crear/editar ──── */
   /* Fila de botones bajo el .select-group del Feed. Píldoras
      pequeñas alineadas a la izquierda. */
@@ -2568,6 +2640,37 @@
     </div>
     <div id="chat-bans-list" class="bans-list">
       <div class="bans-empty">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Mini-modal: prompt de ban con razón opcional + checkbox global -->
+<div id="ban-prompt-modal" class="modal-backdrop" style="display:none;"
+     onclick="if(event.target===event.currentTarget)closeBanPromptModal();">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <div class="modal-title">Banear usuario</div>
+      <button class="btn-logout" onclick="closeBanPromptModal()" title="Cerrar">✕</button>
+    </div>
+    <div class="ban-prompt-body">
+      <p class="ban-prompt-target">
+        Vas a banear a <strong id="ban-prompt-username">—</strong>.
+        Su mensaje será eliminado.
+      </p>
+      <label class="ban-prompt-field">
+        <span>Razón (opcional)</span>
+        <input id="ban-prompt-reason" type="text" maxlength="200"
+               placeholder="Ej. spam, lenguaje ofensivo..." />
+      </label>
+      <label class="ban-prompt-checkbox">
+        <input id="ban-prompt-global" type="checkbox" />
+        <span>🌐 Banear de TODOS los festivales (ban global)</span>
+      </label>
+      <div id="ban-prompt-feedback" class="publish-feedback" style="display:none;"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeBanPromptModal()">Cancelar</button>
+        <button type="button" class="btn-warning" onclick="confirmBan()">🚫 Banear</button>
+      </div>
     </div>
   </div>
 </div>
@@ -5359,6 +5462,10 @@ let chatUnreadCount = 0;
 // desde otra sesión, el contador local se actualiza en la próxima
 // acción local (envío/eliminación/ban/abrir-modal).
 let chatBans = [];
+// Contexto del mini-modal de ban (#ban-prompt-modal). Se setea al
+// abrirlo desde banUserFromMessage y lo lee confirmBan() para hacer
+// el INSERT + soft-delete. null cuando el modal está cerrado.
+let _pendingBanContext = null;
 
 function getChatFestivalId() {
   // Reusa la fuente única del Feed. Si no hay valor, retornar ''.
@@ -5622,21 +5729,34 @@ function updateChatBansBadge() {
   btn.classList.toggle('has-bans', n > 0);
 }
 
-// Carga bans del festival activo. Sin filtro deleted_at (chat_bans
-// no tiene soft-delete). Si modal abierto, re-renderiza la lista.
+// Carga bans del festival activo + bans globales (festival_id IS NULL).
+// El badge del header y la lista del modal mezclan ambos tipos; los
+// globales se diferencian visualmente con icono 🌐 en renderChatBans.
 async function loadChatBans() {
   const fid = getChatFestivalId();
   if (!fid) {
-    chatBans = [];
+    // Sin festival activo: solo cargamos los globales para que el
+    // badge refleje la realidad (un global aplica en cualquier
+    // festival que el moderador abra después).
+    const { data, error } = await sb.from('chat_bans')
+      .select('*')
+      .is('festival_id', null)
+      .order('banned_at', { ascending: false });
+    if (error) {
+      console.warn('loadChatBans (globals only)', error);
+      return;
+    }
+    chatBans = data || [];
     updateChatBansBadge();
     if (document.getElementById('chat-bans-modal').style.display !== 'none') {
       renderChatBans();
     }
     return;
   }
+  // OR de dos predicados: per-festival exacto OR global (festival_id null).
   const { data, error } = await sb.from('chat_bans')
     .select('*')
-    .eq('festival_id', fid)
+    .or(`festival_id.eq.${fid},festival_id.is.null`)
     .order('banned_at', { ascending: false });
   if (error) {
     console.warn('loadChatBans', error);
@@ -5649,53 +5769,93 @@ async function loadChatBans() {
   }
 }
 
-// Banea al user_id del mensaje y soft-deletea ese mismo mensaje.
-// Flujo: prompt razón (cancel = abort silencioso) → confirm → INSERT
-// chat_bans + UPDATE live_chat_messages → reload. La RLS del INSERT
-// de live_chat_messages bloqueará automáticamente futuros mensajes
-// del usuario baneado (NOT EXISTS chat_bans).
-async function banUserFromMessage(messageId, userId, userName) {
+// Click en 🚫 de un mensaje: abre el mini-modal #ban-prompt-modal
+// con el contexto en _pendingBanContext. La validación, el INSERT
+// del ban y el soft-delete del mensaje viven en confirmBan().
+function banUserFromMessage(messageId, userId, userName) {
   if (!messageId || !userId) return;
-  const fid = getChatFestivalId();
-  if (!fid) {
-    showChatFeedback('Selecciona un festival antes de banear', 'err');
+  openBanPromptModal(messageId, userId, userName);
+}
+
+function openBanPromptModal(messageId, userId, userName) {
+  _pendingBanContext = { messageId, userId, userName: userName || '' };
+  const displayName = userName || ('uid:' + userId.slice(0, 8));
+  document.getElementById('ban-prompt-username').textContent = displayName;
+  document.getElementById('ban-prompt-reason').value = '';
+  document.getElementById('ban-prompt-global').checked = false;
+  const fbEl = document.getElementById('ban-prompt-feedback');
+  if (fbEl) { fbEl.style.display = 'none'; fbEl.textContent = ''; }
+  document.getElementById('ban-prompt-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('ban-prompt-reason')?.focus(), 50);
+}
+
+function closeBanPromptModal() {
+  const m = document.getElementById('ban-prompt-modal');
+  if (m) m.style.display = 'none';
+  _pendingBanContext = null;
+}
+
+function showBanPromptFeedback(msg, type) {
+  const el = document.getElementById('ban-prompt-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + (type || '');
+  el.style.display = 'block';
+}
+
+// Confirma el ban con el contexto de _pendingBanContext + valores
+// del modal. Si checkbox global está marcado, festival_id = NULL
+// (aplica a todos los festivales); si no, festival_id = activo del
+// select. Tras éxito: cerrar modal + loadChatMessages (que dispara
+// loadChatBans → badge actualizado). En error mantenemos el modal
+// abierto para que el moderador pueda corregir o cancelar.
+async function confirmBan() {
+  if (!_pendingBanContext) return;
+  const { messageId, userId } = _pendingBanContext;
+  const reason   = document.getElementById('ban-prompt-reason').value.trim();
+  const isGlobal = document.getElementById('ban-prompt-global').checked;
+  const fid = isGlobal ? null : getChatFestivalId();
+  if (!isGlobal && !fid) {
+    showBanPromptFeedback('No hay festival seleccionado. Marca "ban global" o cierra y selecciona uno.', 'err');
     return;
   }
-  const reasonRaw = prompt('Razón del ban (opcional, deja vacío para omitir):', '');
-  if (reasonRaw === null) return; // cancel del prompt
-  const reason = reasonRaw.trim();
-  const displayName = userName || ('uid:' + userId.slice(0, 8));
-  if (!confirm(`¿Banear a ${displayName}? Su mensaje será eliminado.`)) return;
   const user = sb.auth.currentSession?.user
     || (await sb.auth.getSession()).data.session?.user;
   const email = user?.email || '';
-  // 1) INSERT del ban
+  // 1) INSERT del ban (festival_id null para global)
   const { error: banErr } = await sb.from('chat_bans').insert({
     user_id: userId,
-    festival_id: fid,
+    festival_id: fid, // null si global
     banned_by_email: email,
     reason: reason || null,
   });
   if (banErr) {
-    showChatFeedback('Error al banear: ' + banErr.message, 'err');
+    showBanPromptFeedback('Error al banear: ' + banErr.message, 'err');
     return;
   }
-  // 2) Soft-delete del mensaje. deleted_by_email TAL CUAL (sin prefijo
-  // "[ban]") — el motivo del ban vive en chat_bans.reason.
+  // 2) Soft-delete del mensaje que disparó el ban (mismo flujo que
+  // delete normal: el motivo del ban vive en chat_bans.reason).
   const { error: delErr } = await sb.from('live_chat_messages')
     .update({
       deleted_at: new Date().toISOString(),
       deleted_by_email: email,
     })
     .eq('id', messageId);
+  closeBanPromptModal();
   if (delErr) {
-    // El ban quedó aplicado; avisar pero no abortar.
+    // El ban quedó aplicado; avisar al moderador en el feedback
+    // global del chat pero no abortar el flujo.
     showChatFeedback('Usuario baneado, pero error al eliminar mensaje: ' + delErr.message, 'err');
     await loadChatMessages();
     return;
   }
   await loadChatMessages(); // dispara loadChatBans → contador actualizado
-  showChatFeedback('Usuario baneado correctamente', 'ok');
+  showChatFeedback(
+    isGlobal
+      ? 'Usuario baneado globalmente (todos los festivales)'
+      : 'Usuario baneado correctamente',
+    'ok'
+  );
 }
 
 function openBansModal() {
@@ -5724,16 +5884,23 @@ function renderChatBans() {
     const name = getChatUserNameFromCache(b.user_id) || ('uid:' + (b.user_id || '').slice(0, 8));
     const when = formatChatTime(b.banned_at);
     const by = (b.banned_by_email || '').split('@')[0] || '—';
+    // Bans GLOBALES (festival_id IS NULL): prefijo 🌐 antes del nombre
+    // y mención explícita en la línea meta para distinguirlos a la vista.
+    const isGlobal  = b.festival_id === null;
+    const globalIcn = isGlobal
+      ? '<span class="ban-global-icon" title="Ban global (todos los festivales)">🌐</span>'
+      : '';
+    const scopeLabel = isGlobal ? ' · global' : '';
     const reasonHtml = b.reason
       ? `<div class="bans-item-reason">"${escapeHtml(b.reason)}"</div>`
       : '';
     return `
       <div class="bans-item">
         <div class="bans-item-row">
-          <div class="bans-item-name">${escapeHtml(name)}</div>
+          <div class="bans-item-name">${globalIcn}${escapeHtml(name)}</div>
           <button class="btn-mini ok" type="button" onclick="unbanUser('${escapeAttr(b.id)}')">Desbanear</button>
         </div>
-        <div class="bans-item-meta">${escapeHtml(when)} · por ${escapeHtml(by)}</div>
+        <div class="bans-item-meta">${escapeHtml(when)} · por ${escapeHtml(by)}${scopeLabel}</div>
         ${reasonHtml}
       </div>`;
   }).join('');
@@ -5881,8 +6048,8 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
 });
 
 // Escape cierra modales abiertos (jugador, baneados del chat,
-// festival). Si en el futuro hay más, añadir aquí cada par
-// {selector, closeFn}.
+// festival, prompt de ban). Si en el futuro hay más, añadir aquí
+// cada par {selector, closeFn}.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   const playerModal = document.getElementById('player-edit-modal');
@@ -5891,6 +6058,8 @@ document.addEventListener('keydown', e => {
   if (bansModal && bansModal.style.display !== 'none') closeBansModal();
   const festModal = document.getElementById('festival-edit-modal');
   if (festModal && festModal.style.display !== 'none') closeFestivalModal();
+  const banPromptModal = document.getElementById('ban-prompt-modal');
+  if (banPromptModal && banPromptModal.style.display !== 'none') closeBanPromptModal();
 });
 </script>
 </body>
