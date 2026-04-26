@@ -1619,6 +1619,38 @@
     color: #e05252;
     border-color: #e05252;
   }
+  /* Botón banear: idéntico al delete pero anclado a la izquierda
+     del ✕ (right:18px deja 8px de gap entre ambos botones, que son
+     de 22px). Color ámbar/naranja para diferenciar del rojo del
+     eliminar — banear es una acción más severa que merece su propio
+     tono. Oculto si .is-deleted o .is-me (no autoban). */
+  .chat-msg-ban-btn {
+    position: absolute;
+    top: -8px;
+    right: 18px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity .15s, color .15s, border-color .15s;
+    z-index: 2;
+  }
+  .chat-msg:hover .chat-msg-ban-btn { opacity: 1; }
+  .chat-msg-ban-btn:hover {
+    color: #f59e0b;
+    border-color: #f59e0b;
+  }
+  .chat-msg.is-deleted .chat-msg-ban-btn,
+  .chat-msg.is-me      .chat-msg-ban-btn { display: none; }
   /* Estado eliminado: la burbuja completa se atenúa, el body se
      reemplaza por una etiqueta italic gris + caption con el email
      del moderador que lo borró. */
@@ -1701,6 +1733,87 @@
   }
   .chat-feedback {
     margin: 0 20px 12px;
+  }
+
+  /* ── BANEADOS: botón en toolbar + modal ─────────────────────── */
+  /* Botón discreto: gris cuando no hay bans, ámbar cuando hay >0
+     (señal visual de que hay moderación activa). */
+  .chat-bans-btn {
+    padding: 6px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .3px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .chat-bans-btn:hover {
+    color: var(--white);
+    border-color: var(--border2);
+  }
+  .chat-bans-btn.has-bans {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.06);
+  }
+  .chat-bans-btn.has-bans:hover {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+  }
+
+  /* Lista del modal: cards verticales con nombre, meta, razón, botón
+     desbanear. Razón en italic gris. Estado vacío centrado. */
+  .bans-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .bans-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 30px 10px;
+    font-style: italic;
+  }
+  .bans-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .bans-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .bans-item-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--white);
+  }
+  .bans-item-meta {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .3px;
+  }
+  .bans-item-reason {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .bans-item .btn-mini {
+    flex-shrink: 0;
   }
 
   /* ── CHIP COUNTS en el formulario ─────────────────────────── */
@@ -2175,6 +2288,9 @@
     <div class="chat-shell">
       <div class="chat-toolbar">
         <div class="chat-festival-info" id="chat-festival-info">— Selecciona un festival en Feed —</div>
+        <button id="chat-bans-btn" class="chat-bans-btn" type="button" onclick="openBansModal()">
+          🚫 Baneados (0)
+        </button>
         <div class="chat-alias-row">
           <label for="chat-alias">Alias</label>
           <input id="chat-alias" type="text" placeholder="Tu nombre como moderador..." maxlength="40" autocomplete="off" />
@@ -2242,6 +2358,20 @@
       <button class="btn-publish"   onclick="savePlayerEdit()" style="padding:12px 18px;">Guardar</button>
     </div>
     <div id="pe-feedback" class="publish-feedback"></div>
+  </div>
+</div>
+
+<!-- Modal: lista de usuarios baneados del chat (festival activo) -->
+<div id="chat-bans-modal" class="modal-backdrop" style="display:none;"
+     onclick="if(event.target===event.currentTarget)closeBansModal();">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <div class="modal-title">Usuarios baneados</div>
+      <button class="btn-logout" onclick="closeBansModal()" title="Cerrar">✕</button>
+    </div>
+    <div id="chat-bans-list" class="bans-list">
+      <div class="bans-empty">Cargando...</div>
+    </div>
   </div>
 </div>
 
@@ -4701,6 +4831,11 @@ let chatAlias = '';
 let chatRealtimeChannel = null;
 let chatKnownIds = new Set();
 let chatUnreadCount = 0;
+// Bans del festival activo (paso 5). Refrescado en cada loadChatMessages
+// y al abrir el modal. NO realtime en este paso: si otro admin banea
+// desde otra sesión, el contador local se actualiza en la próxima
+// acción local (envío/eliminación/ban/abrir-modal).
+let chatBans = [];
 
 function getChatFestivalId() {
   // Reusa la fuente única del Feed. Si no hay valor, retornar ''.
@@ -4795,6 +4930,10 @@ async function loadChatMessages() {
   // handler lo descarta porque su id ya está aquí.
   chatKnownIds = new Set(chatMessages.map(m => m.id).filter(Boolean));
   renderChatMessages();
+  // Refrescar bans en background (no-await: el badge se pinta cuando
+  // llegue, sin bloquear el render del feed). Mantiene el contador
+  // del header sincronizado tras cualquier acción local.
+  loadChatBans();
 }
 
 // scrollToBottom default true → llamadas históricas (loadChatMessages,
@@ -4829,11 +4968,19 @@ function renderChatMessages({ scrollToBottom = true } = {}) {
     // hasta el hover de la burbuja. CSS también lo oculta cuando
     // .is-deleted (no tiene sentido borrar dos veces).
     const deleteBtn = `<button class="chat-msg-delete-btn" type="button" title="Eliminar mensaje" onclick="deleteChatMessage('${escapeAttr(m.id)}')">✕</button>`;
+    // Botón banear: se pinta solo si hay user_id, no es propio y no
+    // está eliminado. CSS también re-oculta en .is-me / .is-deleted
+    // como defensa en profundidad por si la condición JS fallara.
+    let banBtn = '';
+    if (m.user_id && !isMe && !isDeleted) {
+      banBtn = `<button class="chat-msg-ban-btn" type="button" title="Banear usuario" onclick="banUserFromMessage('${escapeAttr(m.id)}','${escapeAttr(m.user_id)}','${escapeAttr(author)}')">🚫</button>`;
+    }
     const classes = ['chat-msg'];
     if (isMe) classes.push('is-me');
     if (isDeleted) classes.push('is-deleted');
     return `
       <div class="${classes.join(' ')}">
+        ${banBtn}
         ${deleteBtn}
         <div class="chat-msg-header">
           <span class="chat-msg-author">${escapeHtml(author)}</span>
@@ -4923,6 +5070,162 @@ async function deleteChatMessage(id) {
   // chatMessages, pero el render ya lo habremos pintado tachado.
   await loadChatMessages();
   showChatFeedback('Mensaje eliminado', 'ok');
+}
+
+// ── Moderación: ban + lista de baneados (paso 5) ─────────────
+// Lookup de nombre conocido para un user_id baneado. Usa los
+// chatMessages cargados (último 100 del festival activo). Si el
+// user_id no aparece, devuelve null y el render usa fallback
+// "uid:abc12345" — no consultamos auth.users porque no hay RLS
+// que nos lo permita desde el cliente.
+function getChatUserNameFromCache(userId) {
+  if (!userId) return null;
+  // Recorremos en orden inverso para coger el user_name MÁS
+  // RECIENTE conocido (los mensajes vienen ascending por created_at).
+  for (let i = chatMessages.length - 1; i >= 0; i--) {
+    const m = chatMessages[i];
+    if (m.user_id === userId && m.user_name) return m.user_name;
+  }
+  return null;
+}
+
+// Actualiza el texto y estilo del botón "🚫 Baneados (N)" en el
+// chat-toolbar. Idempotente y barato; se llama tras cada loadChatBans.
+function updateChatBansBadge() {
+  const btn = document.getElementById('chat-bans-btn');
+  if (!btn) return;
+  const n = chatBans.length;
+  btn.textContent = `🚫 Baneados (${n})`;
+  btn.classList.toggle('has-bans', n > 0);
+}
+
+// Carga bans del festival activo. Sin filtro deleted_at (chat_bans
+// no tiene soft-delete). Si modal abierto, re-renderiza la lista.
+async function loadChatBans() {
+  const fid = getChatFestivalId();
+  if (!fid) {
+    chatBans = [];
+    updateChatBansBadge();
+    if (document.getElementById('chat-bans-modal').style.display !== 'none') {
+      renderChatBans();
+    }
+    return;
+  }
+  const { data, error } = await sb.from('chat_bans')
+    .select('*')
+    .eq('festival_id', fid)
+    .order('banned_at', { ascending: false });
+  if (error) {
+    console.warn('loadChatBans', error);
+    return;
+  }
+  chatBans = data || [];
+  updateChatBansBadge();
+  if (document.getElementById('chat-bans-modal').style.display !== 'none') {
+    renderChatBans();
+  }
+}
+
+// Banea al user_id del mensaje y soft-deletea ese mismo mensaje.
+// Flujo: prompt razón (cancel = abort silencioso) → confirm → INSERT
+// chat_bans + UPDATE live_chat_messages → reload. La RLS del INSERT
+// de live_chat_messages bloqueará automáticamente futuros mensajes
+// del usuario baneado (NOT EXISTS chat_bans).
+async function banUserFromMessage(messageId, userId, userName) {
+  if (!messageId || !userId) return;
+  const fid = getChatFestivalId();
+  if (!fid) {
+    showChatFeedback('Selecciona un festival antes de banear', 'err');
+    return;
+  }
+  const reasonRaw = prompt('Razón del ban (opcional, deja vacío para omitir):', '');
+  if (reasonRaw === null) return; // cancel del prompt
+  const reason = reasonRaw.trim();
+  const displayName = userName || ('uid:' + userId.slice(0, 8));
+  if (!confirm(`¿Banear a ${displayName}? Su mensaje será eliminado.`)) return;
+  const user = sb.auth.currentSession?.user
+    || (await sb.auth.getSession()).data.session?.user;
+  const email = user?.email || '';
+  // 1) INSERT del ban
+  const { error: banErr } = await sb.from('chat_bans').insert({
+    user_id: userId,
+    festival_id: fid,
+    banned_by_email: email,
+    reason: reason || null,
+  });
+  if (banErr) {
+    showChatFeedback('Error al banear: ' + banErr.message, 'err');
+    return;
+  }
+  // 2) Soft-delete del mensaje. deleted_by_email TAL CUAL (sin prefijo
+  // "[ban]") — el motivo del ban vive en chat_bans.reason.
+  const { error: delErr } = await sb.from('live_chat_messages')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_email: email,
+    })
+    .eq('id', messageId);
+  if (delErr) {
+    // El ban quedó aplicado; avisar pero no abortar.
+    showChatFeedback('Usuario baneado, pero error al eliminar mensaje: ' + delErr.message, 'err');
+    await loadChatMessages();
+    return;
+  }
+  await loadChatMessages(); // dispara loadChatBans → contador actualizado
+  showChatFeedback('Usuario baneado correctamente', 'ok');
+}
+
+function openBansModal() {
+  const modal = document.getElementById('chat-bans-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  // Render inmediato con lo que ya tengamos en memoria, y luego
+  // refrescar desde BD por si hay bans nuevos.
+  renderChatBans();
+  loadChatBans();
+}
+
+function closeBansModal() {
+  const modal = document.getElementById('chat-bans-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderChatBans() {
+  const list = document.getElementById('chat-bans-list');
+  if (!list) return;
+  if (chatBans.length === 0) {
+    list.innerHTML = '<div class="bans-empty">No hay usuarios baneados en este festival</div>';
+    return;
+  }
+  list.innerHTML = chatBans.map(b => {
+    const name = getChatUserNameFromCache(b.user_id) || ('uid:' + (b.user_id || '').slice(0, 8));
+    const when = formatChatTime(b.banned_at);
+    const by = (b.banned_by_email || '').split('@')[0] || '—';
+    const reasonHtml = b.reason
+      ? `<div class="bans-item-reason">"${escapeHtml(b.reason)}"</div>`
+      : '';
+    return `
+      <div class="bans-item">
+        <div class="bans-item-row">
+          <div class="bans-item-name">${escapeHtml(name)}</div>
+          <button class="btn-mini ok" type="button" onclick="unbanUser('${escapeAttr(b.id)}')">Desbanear</button>
+        </div>
+        <div class="bans-item-meta">${escapeHtml(when)} · por ${escapeHtml(by)}</div>
+        ${reasonHtml}
+      </div>`;
+  }).join('');
+}
+
+async function unbanUser(banId) {
+  if (!banId) return;
+  if (!confirm('¿Desbanear a este usuario? Podrá volver a escribir.')) return;
+  const { error } = await sb.from('chat_bans').delete().eq('id', banId);
+  if (error) {
+    showChatFeedback('Error al desbanear: ' + error.message, 'err');
+    return;
+  }
+  await loadChatBans();
+  showChatFeedback('Usuario desbaneado', 'ok');
 }
 
 // ── Realtime + badge ─────────────────────────────────────────
@@ -5054,11 +5357,15 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') login();
 });
 
-// Escape cierra modales abiertos (ahora mismo, modal de edición de jugador)
+// Escape cierra modales abiertos (modal de edición de jugador y
+// modal de usuarios baneados del chat). Si en el futuro hay más,
+// añadir aquí cada par {selector, closeFn}.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  const modal = document.getElementById('player-edit-modal');
-  if (modal && modal.style.display !== 'none') closePlayerEditModal();
+  const playerModal = document.getElementById('player-edit-modal');
+  if (playerModal && playerModal.style.display !== 'none') closePlayerEditModal();
+  const bansModal = document.getElementById('chat-bans-modal');
+  if (bansModal && bansModal.style.display !== 'none') closeBansModal();
 });
 </script>
 </body>
