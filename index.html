@@ -795,6 +795,24 @@
     border-color: rgba(201,168,76,.3);
     color: var(--gold);
   }
+  /* Badge dorado de mensajes no leídos junto al texto del tab.
+     Solo visible cuando chatUnreadCount > 0. Cap visual a 99+. */
+  .nav-badge {
+    display: inline-block;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    margin-left: 6px;
+    background: var(--gold);
+    color: var(--bg);
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 9px;
+    line-height: 18px;
+    text-align: center;
+    vertical-align: middle;
+    letter-spacing: 0;
+  }
 
   /* ── VIEW SWITCHER ───────────────────────────────────────── */
   .view { display: none; flex: 1; min-height: calc(100vh - 56px); }
@@ -1818,7 +1836,7 @@
     <nav class="header-nav">
       <button class="nav-tab active" data-view="feed"    onclick="switchView('feed')">Feed</button>
       <button class="nav-tab"        data-view="players" onclick="switchView('players')">Jugadores</button>
-      <button class="nav-tab"        data-view="chat"    onclick="switchView('chat')">Chat</button>
+      <button class="nav-tab"        data-view="chat"    onclick="switchView('chat')">Chat<span class="nav-badge" id="nav-chat-badge" style="display:none;">0</span></button>
     </nav>
     <div class="header-user">
       <div class="user-avatar" id="user-initials">—</div>
@@ -2431,6 +2449,7 @@ async function logout() {
   clearInterval(refreshInterval);
   unsubscribeFestivalPlayersRealtime();
   unsubscribeFeedRealtime();
+  unsubscribeChatRealtime();
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -2450,6 +2469,9 @@ function showApp(user, adminName) {
     // El subscribe vive aquí porque la vista Feed es la activa al login.
     loadFestivalVideos();
     subscribeFestivalVideosRealtime();
+    // Chat realtime activo desde el login para que el badge cuente
+    // mensajes nuevos aunque el moderador esté en otra pestaña.
+    subscribeChatRealtime();
   });
   loadPosts();
   // Realtime del feed: WebSocket sobre live_updates. El indicador
@@ -2511,6 +2533,12 @@ function onFestivalChange() {
   if (document.getElementById('view-chat')?.classList.contains('active')) {
     loadChatMessages();
   }
+  // Realtime del chat: re-suscribir al canal del nuevo festival y
+  // resetear estado per-festival (badge + ids vistos).
+  chatKnownIds.clear();
+  chatUnreadCount = 0;
+  updateChatBadge();
+  subscribeChatRealtime();
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -3001,6 +3029,9 @@ function switchView(name) {
   }
   if (name === 'chat') {
     initChatAlias();
+    // Reset del badge al entrar: el moderador "lee" todos los pendientes.
+    chatUnreadCount = 0;
+    updateChatBadge();
     loadChatMessages();
   }
 }
@@ -4612,6 +4643,18 @@ function unsubscribeFeedRealtime() {
 const CHAT_ALIAS_KEY = 'vpt_chat_alias';
 let chatMessages = [];
 let chatAlias = '';
+// ── Realtime + badge (paso 3) ─────────────────────────────────
+// chatRealtimeChannel: canal Supabase activo SIEMPRE que haya
+// festival, no solo cuando la pestaña Chat está visible. Necesario
+// para que el badge cuente eventos llegados estando en otra tab.
+// chatKnownIds: Set para detectar duplicados (mensaje propio que
+// llega por realtime después del INSERT local con loadChatMessages).
+// chatUnreadCount: contador de mensajes nuevos cuando la pestaña
+// no es la activa; se resetea al entrar a Chat.
+let chatRealtimeChannel = null;
+let chatKnownIds = new Set();
+let chatUnreadCount = 0;
+
 function getChatFestivalId() {
   // Reusa la fuente única del Feed. Si no hay valor, retornar ''.
   return document.getElementById('sel-festival')?.value || '';
@@ -4697,6 +4740,10 @@ async function loadChatMessages() {
     return;
   }
   chatMessages = data || [];
+  // Pre-poblar chatKnownIds para evitar duplicados con realtime: si
+  // un INSERT llega en el momento del fetch o justo después, el
+  // handler lo descarta porque su id ya está aquí.
+  chatKnownIds = new Set(chatMessages.map(m => m.id).filter(Boolean));
   renderChatMessages();
 }
 
@@ -4778,6 +4825,87 @@ async function sendChatMessage() {
   }
   input.value = '';
   await loadChatMessages();
+}
+
+// ── Realtime + badge ─────────────────────────────────────────
+// Suscripción al canal de live_chat_messages para el festival activo.
+// Se mantiene viva incluso cuando la pestaña Chat NO es la visible
+// — necesario para que el badge cuente eventos llegados estando en
+// otra tab. Mismo patrón que subscribeFeedRealtime.
+//
+// Escucha solo INSERT (mensajes nuevos). DELETE no se usa: nunca
+// borramos físicamente; cuando exista soft-delete se añadirá UPDATE.
+function subscribeChatRealtime() {
+  if (chatRealtimeChannel) {
+    try { sb.removeChannel(chatRealtimeChannel); } catch(_) {}
+    chatRealtimeChannel = null;
+  }
+  const fid = getChatFestivalId();
+  if (!fid) return;
+  chatRealtimeChannel = sb.channel('live-chat:' + fid)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'live_chat_messages',
+      filter: `festival_id=eq.${fid}`,
+    }, (payload) => {
+      handleChatRealtimeInsert(payload.new);
+    })
+    .subscribe();
+}
+
+function unsubscribeChatRealtime() {
+  if (chatRealtimeChannel) {
+    try { sb.removeChannel(chatRealtimeChannel); } catch(_) {}
+    chatRealtimeChannel = null;
+  }
+}
+
+// Procesa un INSERT que llega por WebSocket. Idempotente vs duplicados
+// gracias a chatKnownIds (loadChatMessages lo precarga, sendChatMessage
+// recarga después de insertar). Si la pestaña Chat está activa,
+// detectamos si el usuario está al final ANTES de mutar la lista
+// para decidir si mantenemos auto-scroll o respetamos su posición.
+function handleChatRealtimeInsert(row) {
+  if (!row) return;
+  const id = row.id;
+  if (!id || chatKnownIds.has(id)) return;
+  // Si llega un mensaje de un festival distinto al activo, ignorar
+  // (el filter del canal ya lo controla, pero defensa adicional al
+  // cambiar festival mid-event).
+  const activeFid = getChatFestivalId();
+  if (row.festival_id && activeFid && row.festival_id !== activeFid) return;
+
+  const isChatActive = document.getElementById('view-chat')?.classList.contains('active');
+  // Detectar si estamos al final ANTES de mutar y re-renderizar.
+  const list = document.getElementById('chat-messages');
+  const wasAtBottom = list
+    ? (list.scrollHeight - list.scrollTop - list.clientHeight) < 50
+    : true;
+
+  chatMessages.push(row);
+  chatKnownIds.add(id);
+
+  if (isChatActive) {
+    // Auto-scroll solo si el moderador estaba al final del chat.
+    renderChatMessages({ scrollToBottom: wasAtBottom });
+  } else {
+    // En otra pestaña: render silencioso + bump del badge.
+    renderChatMessages({ scrollToBottom: false });
+    chatUnreadCount += 1;
+    updateChatBadge();
+  }
+}
+
+function updateChatBadge() {
+  const b = document.getElementById('nav-chat-badge');
+  if (!b) return;
+  if (chatUnreadCount > 0) {
+    b.textContent = chatUnreadCount > 99 ? '99+' : String(chatUnreadCount);
+    b.style.display = 'inline-block';
+  } else {
+    b.style.display = 'none';
+  }
 }
 
 // ── CHECK SESSION ─────────────────────────────────────────────
