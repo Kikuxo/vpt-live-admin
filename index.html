@@ -1900,6 +1900,58 @@
     cursor: pointer;
   }
 
+  /* Toggle "Mostrar archivados" en .festival-actions: empujado a la
+     derecha con margin-left:auto, estilo discreto. */
+  .show-archived-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    user-select: none;
+  }
+  .show-archived-toggle input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--gold);
+    cursor: pointer;
+  }
+
+  /* Botones Archivar / Reactivar del modal de festival. Mismo padding
+     que .btn-publish para alineación visual. */
+  .btn-warning {
+    padding: 12px 18px;
+    background: #f59e0b;
+    border: none;
+    border-radius: 8px;
+    color: #1a1a1a;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .3px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-warning:hover  { background: #d97a06; }
+  .btn-warning:disabled { opacity: .4; cursor: not-allowed; }
+
+  .btn-success {
+    padding: 12px 18px;
+    background: #16a34a;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .3px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-success:hover  { background: #128034; }
+  .btn-success:disabled { opacity: .4; cursor: not-allowed; }
+
   /* ── CHIP COUNTS en el formulario ─────────────────────────── */
   .chipcounts-section {
     display: flex;
@@ -2113,6 +2165,10 @@
         <button class="btn-mini" id="edit-festival-btn" type="button"
                 onclick="openFestivalModal(document.getElementById('sel-festival').value)"
                 style="display:none;">✎ Editar</button>
+        <label class="show-archived-toggle">
+          <input id="show-archived-cb" type="checkbox" onchange="toggleShowArchived()" />
+          <span>Mostrar archivados 📦</span>
+        </label>
       </div>
 
       <div class="divider"></div>
@@ -2490,6 +2546,11 @@
       </label>
       <div id="fest-feedback" class="publish-feedback" style="display:none;"></div>
       <div class="modal-actions">
+        <button type="button" id="festival-archive-btn" class="btn-warning"
+                onclick="archiveFestival()" style="display:none;">📦 Archivar</button>
+        <button type="button" id="festival-unarchive-btn" class="btn-success"
+                onclick="unarchiveFestival()" style="display:none;">📤 Reactivar</button>
+        <div style="flex:1;"></div>
         <button type="button" class="btn-secondary" onclick="closeFestivalModal()">Cancelar</button>
         <button type="submit" class="btn-publish" style="padding:12px 18px;">Guardar</button>
       </div>
@@ -2557,6 +2618,11 @@ let festivals = [];
 // Se setea en openFestivalModal y se lee en saveFestival para
 // decidir entre INSERT y UPDATE.
 let _editingFestivalId = null;
+// Toggle de la fila .festival-actions: si false, loadFestivals
+// filtra archived_at IS NULL en el query y el select solo muestra
+// activos. Si true, traemos todos y reordenamos en cliente
+// (activos primero, archivados al final con prefijo 📦).
+let showArchivedFestivals = false;
 let refreshInterval = null;
 let editingPostId = null;  // null = modo nuevo; UUID = modo edición
 let currentChipcounts = [];  // [{ player_id, chip_count }] para la sección Chip Count
@@ -2811,20 +2877,38 @@ function showApp(user, adminName) {
 
 // ── FESTIVALS ─────────────────────────────────────────────────
 async function loadFestivals() {
-  // Cargamos también country/starts_at/ends_at para reusar en el
-  // modal de edición sin tener que hacer un segundo fetch.
-  const { data } = await sb.from('festivals')
-    .select('id,title,flag_emoji,is_live,country,starts_at,ends_at')
+  // Cargamos también country/starts_at/ends_at + archived_at para
+  // reusar en el modal de edición sin segundo fetch. Si el toggle
+  // de archivados está apagado, filtramos a nivel de query (cubre
+  // el índice parcial festivals_active_idx).
+  let q = sb.from('festivals')
+    .select('id,title,flag_emoji,is_live,country,starts_at,ends_at,archived_at')
     .order('starts_at', { ascending: false })
-    .limit(20);
+    .limit(50);
+  if (!showArchivedFestivals) q = q.is('archived_at', null);
+  const { data } = await q;
   festivals = data || [];
+  // Si mostramos archivados, reordenamos: activos primero (orden
+  // del query: starts_at desc), archivados al final (mismo orden
+  // entre ellos). Stable sort sobre el array ya ordenado.
+  if (showArchivedFestivals) {
+    festivals.sort((a, b) => {
+      const aArch = a.archived_at ? 1 : 0;
+      const bArch = b.archived_at ? 1 : 0;
+      return aArch - bArch; // 0s antes, 1s después; mantiene orden interno
+    });
+  }
   const sel = document.getElementById('sel-festival');
   sel.innerHTML = '<option value="">— Selecciona festival —</option>';
   festivals.forEach(f => {
     const opt = document.createElement('option');
     opt.value = f.id;
-    opt.textContent = `${f.flag_emoji || '🎴'} ${f.title}${f.is_live ? ' 🟢' : ''}`;
-    if (f.is_live) opt.selected = true;
+    const archPrefix = f.archived_at ? '📦 ' : '';
+    opt.textContent = `${archPrefix}${f.flag_emoji || '🎴'} ${f.title}${f.is_live ? ' 🟢' : ''}`;
+    // Auto-select: solo festivales is_live Y NO archivados (los
+    // archivados nunca deben ser auto-seleccionados aunque tengan
+    // is_live=true por error).
+    if (f.is_live && !f.archived_at) opt.selected = true;
     sel.appendChild(opt);
   });
   syncFestivalEditButton();
@@ -2895,6 +2979,8 @@ function openFestivalModal(festivalId) {
   const $starts   = document.getElementById('fest-starts-at');
   const $ends     = document.getElementById('fest-ends-at');
   const $isLive   = document.getElementById('fest-is-live');
+  const $archBtn   = document.getElementById('festival-archive-btn');
+  const $unarchBtn = document.getElementById('festival-unarchive-btn');
 
   if (fbEl) { fbEl.style.display = 'none'; fbEl.textContent = ''; }
 
@@ -2908,13 +2994,26 @@ function openFestivalModal(festivalId) {
       _editingFestivalId = null;
       return;
     }
-    titleEl.textContent = 'Editar festival';
+    // Título dinámico: si está archivado, mostramos también la fecha
+    // de archivo entre paréntesis para contexto del moderador.
+    if (f.archived_at) {
+      const d = new Date(f.archived_at);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = d.getFullYear();
+      titleEl.textContent = `Editar festival · 📦 Archivado el ${dd}/${mm}/${yy}`;
+    } else {
+      titleEl.textContent = 'Editar festival';
+    }
     $title.value   = f.title || '';
     $country.value = f.country || '';
     $flag.value    = f.flag_emoji || '';
     $starts.value  = f.starts_at || '';
     $ends.value    = f.ends_at || '';
     $isLive.checked = !!f.is_live;
+    // Archivar visible solo si está activo; Reactivar solo si archivado.
+    if ($archBtn)   $archBtn.style.display   = f.archived_at ? 'none' : '';
+    if ($unarchBtn) $unarchBtn.style.display = f.archived_at ? '' : 'none';
   } else {
     titleEl.textContent = 'Nuevo festival';
     $title.value = '';
@@ -2923,6 +3022,10 @@ function openFestivalModal(festivalId) {
     $starts.value = '';
     $ends.value = '';
     $isLive.checked = false;
+    // En modo crear no tiene sentido archivar/reactivar (el festival
+    // no existe todavía).
+    if ($archBtn)   $archBtn.style.display   = 'none';
+    if ($unarchBtn) $unarchBtn.style.display = 'none';
   }
   document.getElementById('festival-edit-modal').style.display = 'flex';
   // Enfocar el primer input para flujo ágil.
@@ -3008,6 +3111,134 @@ async function saveFestival(event) {
     syncFestivalEditButton();
     setTimeout(closeFestivalModal, 700);
   }
+}
+
+// ── ARCHIVO de festivales (soft-archive reversible) ──────────
+// archived_at IS NULL = activo, timestamp = archivado en esa fecha.
+// Toggle "Mostrar archivados" controla si el query incluye los
+// archivados; el modal de Editar muestra Archivar o Reactivar
+// según el estado actual del festival.
+
+function toggleShowArchived() {
+  const cb = document.getElementById('show-archived-cb');
+  showArchivedFestivals = !!cb?.checked;
+  const sel = document.getElementById('sel-festival');
+  const keepId = sel.value;
+  loadFestivals().then(() => {
+    // Si el festival que estaba seleccionado sigue presente en el
+    // select tras el reload, lo restauramos. Si NO (ej. era
+    // archivado y se acaba de ocultar el toggle), auto-seleccionamos
+    // el primer activo y disparamos onFestivalChange para que el
+    // feed/realtime se reconfiguren.
+    const stillThere = keepId && Array.from(sel.options).some(o => o.value === keepId);
+    if (stillThere) {
+      sel.value = keepId;
+    } else {
+      const firstActive = festivals.find(f => !f.archived_at);
+      if (firstActive) {
+        sel.value = firstActive.id;
+        onFestivalChange();
+      }
+    }
+    syncFestivalEditButton();
+  });
+}
+
+// Archiva el festival que esté abierto en el modal. Antes del UPDATE
+// muestra un confirm con el conteo paralelo de datos asociados (posts,
+// chat, jugadores, vídeos) para que el moderador sepa qué se preserva.
+async function archiveFestival() {
+  const id = _editingFestivalId;
+  if (!id) return;
+  const f = festivals.find(x => x.id === id);
+  if (!f) return;
+  showFestivalFeedback('Comprobando datos...', '');
+  try {
+    const [posts, players, messages, videos] = await Promise.all([
+      sb.from('live_updates')      .select('id', { count: 'exact', head: true }).eq('festival_id', id),
+      sb.from('festival_players')  .select('id', { count: 'exact', head: true }).eq('festival_id', id),
+      sb.from('live_chat_messages').select('id', { count: 'exact', head: true }).eq('festival_id', id),
+      sb.from('festival_videos')   .select('id', { count: 'exact', head: true }).eq('festival_id', id),
+    ]);
+    const counts = {
+      posts:    posts.count    || 0,
+      players:  players.count  || 0,
+      messages: messages.count || 0,
+      videos:   videos.count   || 0,
+    };
+    const msg =
+      `¿Archivar "${f.title}"?\n\n` +
+      `Datos asociados (se preservarán):\n` +
+      `- ${counts.posts} posts del feed\n` +
+      `- ${counts.messages} mensajes de chat\n` +
+      `- ${counts.players} jugadores con chipcounts\n` +
+      `- ${counts.videos} vídeos\n\n` +
+      `Podrás reactivarlo más tarde marcando "Mostrar archivados".`;
+    if (!confirm(msg)) {
+      // Limpiamos el feedback "Comprobando datos..." si cancela.
+      const fbEl = document.getElementById('fest-feedback');
+      if (fbEl) { fbEl.style.display = 'none'; fbEl.textContent = ''; }
+      return;
+    }
+    const { error } = await sb.from('festivals')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      showFestivalFeedback('Error al archivar: ' + error.message, 'err');
+      return;
+    }
+    showFestivalFeedback('Festival archivado', 'ok');
+    setTimeout(closeFestivalModal, 700);
+    // Si el archivado era el festival activo del select y NO mostramos
+    // archivados, el reload lo va a sacar del select; auto-seleccionamos
+    // el primer activo disponible y disparamos onFestivalChange para
+    // re-suscribir realtime, recargar feed, etc.
+    const sel = document.getElementById('sel-festival');
+    const wasActive = sel.value === id;
+    await loadFestivals();
+    if (wasActive && !showArchivedFestivals) {
+      const firstActive = festivals.find(x => !x.archived_at);
+      if (firstActive) {
+        sel.value = firstActive.id;
+        onFestivalChange();
+      } else {
+        sel.value = '';
+        syncFestivalEditButton();
+      }
+    } else if (showArchivedFestivals) {
+      // Mantenemos la selección (el archivado sigue en el select con 📦).
+      sel.value = id;
+      syncFestivalEditButton();
+    }
+  } catch (e) {
+    showFestivalFeedback('Error inesperado: ' + (e?.message || e), 'err');
+  }
+}
+
+async function unarchiveFestival() {
+  const id = _editingFestivalId;
+  if (!id) return;
+  const f = festivals.find(x => x.id === id);
+  if (!f) return;
+  if (!confirm(`¿Reactivar "${f.title}"? Volverá a ser seleccionable como festival activo.`)) {
+    return;
+  }
+  const { error } = await sb.from('festivals')
+    .update({ archived_at: null })
+    .eq('id', id);
+  if (error) {
+    showFestivalFeedback('Error al reactivar: ' + error.message, 'err');
+    return;
+  }
+  showFestivalFeedback('Festival reactivado', 'ok');
+  setTimeout(closeFestivalModal, 700);
+  // Mantenemos la selección actual del select (el reactivado puede o
+  // no estar seleccionado; el reload reordena pero conserva la opción).
+  const sel = document.getElementById('sel-festival');
+  const keepId = sel.value;
+  await loadFestivals();
+  if (keepId) sel.value = keepId;
+  syncFestivalEditButton();
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
