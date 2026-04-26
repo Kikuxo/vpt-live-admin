@@ -1474,6 +1474,170 @@
     border-color: #e05252;
   }
 
+  /* ── CHAT (admin moderation) ──────────────────────────────── */
+  /* La vista #view-chat usa un layout flex column ocupando el alto
+     disponible; .chat-shell es el contenedor que centra y limita el
+     ancho para legibilidad. */
+  #view-chat.view {
+    padding: 0;
+  }
+  .chat-shell {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 110px);
+    max-width: 920px;
+    width: 100%;
+    margin: 0 auto;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .chat-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .chat-festival-info {
+    flex: 1;
+    min-width: 220px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .3px;
+  }
+  .chat-festival-info strong {
+    color: var(--white);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+  .chat-alias-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chat-alias-row label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-weight: 600;
+  }
+  .chat-alias-row input {
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-size: 12px;
+    font-family: inherit;
+    width: 200px;
+    outline: none;
+  }
+  .chat-alias-row input:focus { border-color: var(--gold); }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg);
+  }
+  .chat-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 40px 20px;
+    font-style: italic;
+  }
+  .chat-msg {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-width: 75%;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    align-self: flex-start;
+  }
+  .chat-msg.is-me {
+    align-self: flex-end;
+    background: rgba(201, 168, 76, 0.1);
+    border-color: rgba(201, 168, 76, 0.35);
+  }
+  .chat-msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+  .chat-msg-author {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: .2px;
+  }
+  .chat-msg-time {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .3px;
+  }
+  .chat-msg-body {
+    font-size: 13px;
+    color: var(--white);
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+
+  .chat-composer {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .chat-composer input {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--white);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .chat-composer input::placeholder { color: var(--muted); }
+  .chat-composer input:focus { border-color: var(--gold); }
+  .chat-composer button {
+    padding: 10px 20px;
+    background: var(--gold);
+    border: none;
+    border-radius: 8px;
+    color: var(--bg);
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: .5px;
+  }
+  .chat-composer button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+  }
+  .chat-feedback {
+    margin: 0 20px 12px;
+  }
+
   /* ── CHIP COUNTS en el formulario ─────────────────────────── */
   .chipcounts-section {
     display: flex;
@@ -1654,6 +1818,7 @@
     <nav class="header-nav">
       <button class="nav-tab active" data-view="feed"    onclick="switchView('feed')">Feed</button>
       <button class="nav-tab"        data-view="players" onclick="switchView('players')">Jugadores</button>
+      <button class="nav-tab"        data-view="chat"    onclick="switchView('chat')">Chat</button>
     </nav>
     <div class="header-user">
       <div class="user-avatar" id="user-initials">—</div>
@@ -1939,6 +2104,28 @@
 
   </div>
   </div><!-- /#view-players -->
+
+  <!-- ═══════════════════ VIEW: CHAT ══════════════════════════════ -->
+  <div id="view-chat" class="view">
+    <div class="chat-shell">
+      <div class="chat-toolbar">
+        <div class="chat-festival-info" id="chat-festival-info">— Selecciona un festival en Feed —</div>
+        <div class="chat-alias-row">
+          <label for="chat-alias">Alias</label>
+          <input id="chat-alias" type="text" placeholder="Tu nombre como moderador..." maxlength="40" autocomplete="off" />
+        </div>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-empty" id="chat-empty">Cargando mensajes...</div>
+      </div>
+      <div class="chat-composer">
+        <input id="chat-input" type="text" placeholder="Escribe un mensaje..." maxlength="500" autocomplete="off"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatMessage();}" />
+        <button id="chat-send-btn" class="btn-publish" onclick="sendChatMessage()">Enviar</button>
+      </div>
+      <div class="chat-feedback publish-feedback" id="chat-feedback" style="display:none;"></div>
+    </div>
+  </div><!-- /#view-chat -->
 
 </div>
 
@@ -2320,6 +2507,10 @@ function onFestivalChange() {
   // filtra por festival_id activo). Si filter='all' el canal escucha
   // todo y no necesita re-suscripción al cambiar de festival.
   if (currentFilter === 'festival') subscribeFeedRealtime();
+  // Si la pestaña Chat está activa, recargar con el nuevo festival.
+  if (document.getElementById('view-chat')?.classList.contains('active')) {
+    loadChatMessages();
+  }
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -2807,6 +2998,10 @@ function switchView(name) {
     subscribeFestivalPlayersRealtime();
   } else {
     unsubscribeFestivalPlayersRealtime();
+  }
+  if (name === 'chat') {
+    initChatAlias();
+    loadChatMessages();
   }
 }
 
@@ -4397,6 +4592,192 @@ function unsubscribeFeedRealtime() {
     feedRealtimeChannel = null;
   }
   setFeedRealtimeStatus('connecting', 'Conectando...');
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  CHAT (admin moderation, paso 2: lectura + escritura)        ║
+// ╚══════════════════════════════════════════════════════════════╝
+//
+// Flujo:
+//   - El alias del moderador se persiste en localStorage.
+//   - El festival activo se lee del select del Feed (#sel-festival);
+//     este paso solo muestra un indicador de lectura, no hay
+//     selección propia.
+//   - loadChatMessages() filtra deleted_at IS NULL (los soft-deletes
+//     se gestionan en pasos posteriores con vista "ver borrados" en
+//     el admin).
+//   - sendChatMessage() valida alias + body, inserta en BD y recarga.
+//   - Sin realtime (paso 3) ni moderación (pasos 4-5) todavía.
+
+const CHAT_ALIAS_KEY = 'vpt_chat_alias';
+let chatMessages = [];
+let chatAlias = '';
+function getChatFestivalId() {
+  // Reusa la fuente única del Feed. Si no hay valor, retornar ''.
+  return document.getElementById('sel-festival')?.value || '';
+}
+
+function syncChatFestivalIndicator() {
+  const el = document.getElementById('chat-festival-info');
+  if (!el) return;
+  const fid = getChatFestivalId();
+  if (!fid) {
+    el.innerHTML = '— Selecciona un festival en Feed —';
+    return;
+  }
+  const f = festivals.find(x => x.id === fid);
+  if (f) {
+    el.innerHTML = `Festival: <strong>${escapeHtml(f.title)}</strong>${f.is_live ? ' · 🟢 LIVE' : ''}`;
+  } else {
+    el.innerHTML = '— Festival desconocido —';
+  }
+}
+
+function initChatAlias() {
+  const input = document.getElementById('chat-alias');
+  if (!input) return;
+  // Idempotente: si ya tenemos el alias en memoria, mantenemos el
+  // valor del input alineado al state.
+  if (!chatAlias) {
+    try { chatAlias = localStorage.getItem(CHAT_ALIAS_KEY) || ''; } catch(_) { chatAlias = ''; }
+  }
+  input.value = chatAlias;
+  // Listener registrado solo una vez (el oninput del HTML no se usa
+  // para evitar duplicados; idempotencia controlada con dataset).
+  if (!input.dataset.bound) {
+    input.addEventListener('input', () => {
+      chatAlias = input.value.trim();
+      try { localStorage.setItem(CHAT_ALIAS_KEY, chatAlias); } catch(_) {}
+      // Re-render para refrescar la marca is-me en mensajes propios.
+      renderChatMessages();
+    });
+    input.dataset.bound = '1';
+  }
+  updateChatSendButtonState();
+}
+
+function updateChatSendButtonState() {
+  const btn = document.getElementById('chat-send-btn');
+  if (!btn) return;
+  const fid = getChatFestivalId();
+  btn.disabled = !fid;
+}
+
+function showChatFeedback(msg, type) {
+  const el = document.getElementById('chat-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'chat-feedback publish-feedback ' + (type || '');
+  el.style.display = 'block';
+  if (type === 'ok') setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+async function loadChatMessages() {
+  const fid = getChatFestivalId();
+  syncChatFestivalIndicator();
+  updateChatSendButtonState();
+  const empty = document.getElementById('chat-empty');
+  if (!fid) {
+    chatMessages = [];
+    renderChatMessages();
+    if (empty) {
+      empty.textContent = 'Selecciona un festival en Feed para ver el chat';
+      empty.style.display = 'block';
+    }
+    return;
+  }
+  const { data, error } = await sb.from('live_chat_messages')
+    .select('*')
+    .eq('festival_id', fid)
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (error) {
+    console.warn('loadChatMessages', error);
+    showChatFeedback('Error al cargar mensajes: ' + error.message, 'err');
+    return;
+  }
+  chatMessages = data || [];
+  renderChatMessages();
+}
+
+// scrollToBottom default true → llamadas históricas (loadChatMessages,
+// listener del alias) mantienen comportamiento. Realtime pasa false
+// cuando el usuario estaba leyendo arriba (no secuestrar scroll).
+function renderChatMessages({ scrollToBottom = true } = {}) {
+  const list = document.getElementById('chat-messages');
+  if (!list) return;
+  if (chatMessages.length === 0) {
+    list.innerHTML = '<div class="chat-empty" id="chat-empty">' +
+      (getChatFestivalId() ? 'Sin mensajes en este festival todavía' : 'Selecciona un festival en Feed para ver el chat') +
+      '</div>';
+    return;
+  }
+  list.innerHTML = chatMessages.map(m => {
+    const isMe = !!chatAlias && m.user_name === chatAlias;
+    const author = m.user_name || 'Anónimo';
+    const time = formatChatTime(m.created_at);
+    const bodyHtml = `<div class="chat-msg-body">${escapeHtml(m.message || '')}</div>`;
+    const classes = ['chat-msg'];
+    if (isMe) classes.push('is-me');
+    return `
+      <div class="${classes.join(' ')}">
+        <div class="chat-msg-header">
+          <span class="chat-msg-author">${escapeHtml(author)}</span>
+          <span class="chat-msg-time">${escapeHtml(time)}</span>
+        </div>
+        ${bodyHtml}
+      </div>`;
+  }).join('');
+  if (scrollToBottom) list.scrollTop = list.scrollHeight;
+}
+
+// HH:mm si es hoy, "DD/MM HH:mm" si es de otro día.
+function formatChatTime(iso) {
+  if (!iso) return '';
+  const dt = new Date(iso);
+  if (isNaN(dt)) return '';
+  const now = new Date();
+  const sameDay = dt.toDateString() === now.toDateString();
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  if (sameDay) return `${hh}:${mm}`;
+  const d = String(dt.getDate()).padStart(2, '0');
+  const M = String(dt.getMonth() + 1).padStart(2, '0');
+  return `${d}/${M} ${hh}:${mm}`;
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return; // body vacío: silencioso
+  if (!chatAlias) {
+    showChatFeedback('Configura tu alias antes de enviar', 'err');
+    document.getElementById('chat-alias')?.focus();
+    return;
+  }
+  const fid = getChatFestivalId();
+  if (!fid) {
+    showChatFeedback('Selecciona un festival antes de enviar', 'err');
+    return;
+  }
+  const user = sb.auth.currentSession?.user || (await sb.auth.getSession()).data.session?.user;
+  if (!user) {
+    showChatFeedback('Sesión expirada — vuelve a iniciar', 'err');
+    return;
+  }
+  const { error } = await sb.from('live_chat_messages').insert({
+    festival_id: fid,
+    user_id: user.id,
+    user_name: chatAlias,
+    message: text,
+  });
+  if (error) {
+    showChatFeedback('Error al enviar: ' + error.message, 'err');
+    return;
+  }
+  input.value = '';
+  await loadChatMessages();
 }
 
 // ── CHECK SESSION ─────────────────────────────────────────────
