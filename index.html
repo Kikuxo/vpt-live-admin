@@ -1591,6 +1591,53 @@
     background: rgba(201, 168, 76, 0.1);
     border-color: rgba(201, 168, 76, 0.35);
   }
+  /* Botón eliminar oculto por defecto, visible al hover de la
+     burbuja. Anclado arriba-derecha. Estilo discreto: círculo
+     gris semitransparente que pasa a rojo al hover. */
+  .chat-msg-delete-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity .15s, color .15s, border-color .15s;
+    z-index: 2;
+  }
+  .chat-msg:hover .chat-msg-delete-btn { opacity: 1; }
+  .chat-msg-delete-btn:hover {
+    color: #e05252;
+    border-color: #e05252;
+  }
+  /* Estado eliminado: la burbuja completa se atenúa, el body se
+     reemplaza por una etiqueta italic gris + caption con el email
+     del moderador que lo borró. */
+  .chat-msg.is-deleted {
+    opacity: 0.55;
+  }
+  .chat-msg.is-deleted .chat-msg-delete-btn { display: none; }
+  .chat-msg-deleted-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .chat-msg-deleted-by {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+    letter-spacing: .3px;
+  }
   .chat-msg-header {
     display: flex;
     align-items: baseline;
@@ -4729,6 +4776,9 @@ async function loadChatMessages() {
     }
     return;
   }
+  // El admin ve TODOS los mensajes incluidos los soft-deleted (los
+  // pinta tachados/atenuados para auditoría). La app móvil filtra
+  // deleted_at IS NULL en su propio query (paso 6).
   const { data, error } = await sb.from('live_chat_messages')
     .select('*')
     .eq('festival_id', fid)
@@ -4761,13 +4811,30 @@ function renderChatMessages({ scrollToBottom = true } = {}) {
   }
   list.innerHTML = chatMessages.map(m => {
     const isMe = !!chatAlias && m.user_name === chatAlias;
+    const isDeleted = !!m.deleted_at;
     const author = m.user_name || 'Anónimo';
     const time = formatChatTime(m.created_at);
-    const bodyHtml = `<div class="chat-msg-body">${escapeHtml(m.message || '')}</div>`;
+    // Body: cuando el mensaje está soft-deleted, lo reemplazamos por
+    // una etiqueta italic + caption con el email del moderador que lo
+    // borró (truncado al @ para no exponer dominios completos).
+    let bodyHtml;
+    if (isDeleted) {
+      const by = (m.deleted_by_email || '').split('@')[0];
+      const byHtml = by ? `<div class="chat-msg-deleted-by">eliminado por ${escapeHtml(by)}</div>` : '';
+      bodyHtml = `<div class="chat-msg-deleted-label">Mensaje eliminado por moderación</div>${byHtml}`;
+    } else {
+      bodyHtml = `<div class="chat-msg-body">${escapeHtml(m.message || '')}</div>`;
+    }
+    // Botón eliminar: presente siempre en el HTML, oculto por CSS
+    // hasta el hover de la burbuja. CSS también lo oculta cuando
+    // .is-deleted (no tiene sentido borrar dos veces).
+    const deleteBtn = `<button class="chat-msg-delete-btn" type="button" title="Eliminar mensaje" onclick="deleteChatMessage('${escapeAttr(m.id)}')">✕</button>`;
     const classes = ['chat-msg'];
     if (isMe) classes.push('is-me');
+    if (isDeleted) classes.push('is-deleted');
     return `
       <div class="${classes.join(' ')}">
+        ${deleteBtn}
         <div class="chat-msg-header">
           <span class="chat-msg-author">${escapeHtml(author)}</span>
           <span class="chat-msg-time">${escapeHtml(time)}</span>
@@ -4827,14 +4894,45 @@ async function sendChatMessage() {
   await loadChatMessages();
 }
 
+// ── Moderación: soft-delete ──────────────────────────────────
+// UPDATE live_chat_messages SET deleted_at = now(), deleted_by_email
+// = <email del admin>. La RLS del UPDATE solo deja a is_admin().
+// Tras éxito, el INSERT-handler no se dispara (es UPDATE), así que
+// el cambio entra por handleChatRealtimeUpdate al re-suscribirnos
+// también a UPDATEs en este paso. Mientras tanto, recargamos la
+// lista al instante para feedback inmediato del moderador.
+async function deleteChatMessage(id) {
+  if (!id) return;
+  if (!confirm('¿Eliminar este mensaje del chat?')) return;
+  // Email del admin: mismo patrón que sendChatMessage.
+  const user = sb.auth.currentSession?.user
+    || (await sb.auth.getSession()).data.session?.user;
+  const email = user?.email || '';
+  const { error } = await sb.from('live_chat_messages')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_email: email,
+    })
+    .eq('id', id);
+  if (error) {
+    showChatFeedback('Error al eliminar: ' + error.message, 'err');
+    return;
+  }
+  // Refresco local inmediato; el evento UPDATE realtime también
+  // llegará y handleChatRealtimeUpdate reemplazará la fila en
+  // chatMessages, pero el render ya lo habremos pintado tachado.
+  await loadChatMessages();
+  showChatFeedback('Mensaje eliminado', 'ok');
+}
+
 // ── Realtime + badge ─────────────────────────────────────────
 // Suscripción al canal de live_chat_messages para el festival activo.
 // Se mantiene viva incluso cuando la pestaña Chat NO es la visible
 // — necesario para que el badge cuente eventos llegados estando en
 // otra tab. Mismo patrón que subscribeFeedRealtime.
 //
-// Escucha solo INSERT (mensajes nuevos). DELETE no se usa: nunca
-// borramos físicamente; cuando exista soft-delete se añadirá UPDATE.
+// Escucha INSERT (mensajes nuevos) y UPDATE (soft-deletes desde
+// otros admins). DELETE no se usa: nunca borramos físicamente.
 function subscribeChatRealtime() {
   if (chatRealtimeChannel) {
     try { sb.removeChannel(chatRealtimeChannel); } catch(_) {}
@@ -4850,6 +4948,14 @@ function subscribeChatRealtime() {
       filter: `festival_id=eq.${fid}`,
     }, (payload) => {
       handleChatRealtimeInsert(payload.new);
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'live_chat_messages',
+      filter: `festival_id=eq.${fid}`,
+    }, (payload) => {
+      handleChatRealtimeUpdate(payload.new);
     })
     .subscribe();
 }
@@ -4870,6 +4976,9 @@ function handleChatRealtimeInsert(row) {
   if (!row) return;
   const id = row.id;
   if (!id || chatKnownIds.has(id)) return;
+  // Defensa en profundidad: ignorar mensajes ya soft-deleted (la RLS
+  // y el INSERT no permiten esto pero por si acaso).
+  if (row.deleted_at) return;
   // Si llega un mensaje de un festival distinto al activo, ignorar
   // (el filter del canal ya lo controla, pero defensa adicional al
   // cambiar festival mid-event).
@@ -4906,6 +5015,20 @@ function updateChatBadge() {
   } else {
     b.style.display = 'none';
   }
+}
+
+// Procesa un UPDATE realtime (típicamente un soft-delete desde
+// otro admin). Reemplaza la fila en chatMessages por la nueva
+// versión y re-renderiza SIN auto-scroll (no es mensaje nuevo,
+// no debe alterar la posición de lectura del moderador).
+function handleChatRealtimeUpdate(row) {
+  if (!row) return;
+  const id = row.id;
+  if (!id) return;
+  const i = chatMessages.findIndex(m => m.id === id);
+  if (i < 0) return; // mensaje no estaba en local; nada que actualizar
+  chatMessages[i] = row;
+  renderChatMessages({ scrollToBottom: false });
 }
 
 // ── CHECK SESSION ─────────────────────────────────────────────
