@@ -1816,6 +1816,90 @@
     flex-shrink: 0;
   }
 
+  /* ── FESTIVAL: botones de gestión + modal de crear/editar ──── */
+  /* Fila de botones bajo el .select-group del Feed. Píldoras
+     pequeñas alineadas a la izquierda. */
+  .festival-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Form del modal: stack vertical de filas. Cada fila es un flex
+     row para 1-2 campos lado a lado. Reusa .modal exterior. */
+  .festival-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 4px 0 0 0;
+  }
+  .festival-form-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .festival-form-row-title {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .festival-form-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+  .festival-form-col.country-col { flex: 7; }
+  .festival-form-col.flag-col    { flex: 3; }
+  /* Etiqueta uppercase pequeña al estilo .info-field label. */
+  .festival-form label > span {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-weight: 600;
+  }
+  .festival-form input[type="text"],
+  .festival-form input[type="date"] {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .festival-form input[type="text"]:focus,
+  .festival-form input[type="date"]:focus {
+    border-color: var(--gold);
+  }
+  /* Checkbox row: en horizontal (NO column como las demás filas)
+     y span sin uppercase para que el label se lea como texto
+     normal junto al checkbox. */
+  .festival-form .checkbox-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .festival-form .checkbox-row > span {
+    text-transform: none;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--white);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .festival-form .checkbox-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--gold);
+    cursor: pointer;
+  }
+
   /* ── CHIP COUNTS en el formulario ─────────────────────────── */
   .chipcounts-section {
     display: flex;
@@ -2023,6 +2107,12 @@
           <option value="">Cargando festivales...</option>
         </select>
         <input type="text" id="input-tournament" placeholder="Torneo (ej. Main Event, High Roller...)" />
+      </div>
+      <div class="festival-actions">
+        <button class="btn-mini" type="button" onclick="openFestivalModal(null)">+ Nuevo festival</button>
+        <button class="btn-mini" id="edit-festival-btn" type="button"
+                onclick="openFestivalModal(document.getElementById('sel-festival').value)"
+                style="display:none;">✎ Editar</button>
       </div>
 
       <div class="divider"></div>
@@ -2361,6 +2451,52 @@
   </div>
 </div>
 
+<!-- Modal: crear / editar festival -->
+<div id="festival-edit-modal" class="modal-backdrop" style="display:none;"
+     onclick="if(event.target===event.currentTarget)closeFestivalModal();">
+  <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <div class="modal-title" id="festival-modal-title">Nuevo festival</div>
+      <button class="btn-logout" onclick="closeFestivalModal()" title="Cerrar">✕</button>
+    </div>
+    <form id="festival-form" class="festival-form" onsubmit="saveFestival(event)">
+      <label class="festival-form-row festival-form-row-title">
+        <span>Nombre *</span>
+        <input id="fest-title" type="text" required maxlength="100" />
+      </label>
+      <div class="festival-form-row">
+        <label class="festival-form-col country-col">
+          <span>País</span>
+          <input id="fest-country" type="text" maxlength="60" placeholder="Ej. España" />
+        </label>
+        <label class="festival-form-col flag-col">
+          <span>Bandera</span>
+          <input id="fest-flag" type="text" maxlength="8" placeholder="🇪🇸" />
+        </label>
+      </div>
+      <div class="festival-form-row">
+        <label class="festival-form-col">
+          <span>Fecha inicio</span>
+          <input id="fest-starts-at" type="date" />
+        </label>
+        <label class="festival-form-col">
+          <span>Fecha fin</span>
+          <input id="fest-ends-at" type="date" />
+        </label>
+      </div>
+      <label class="festival-form-row checkbox-row">
+        <input id="fest-is-live" type="checkbox" />
+        <span>En directo (is_live)</span>
+      </label>
+      <div id="fest-feedback" class="publish-feedback" style="display:none;"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeFestivalModal()">Cancelar</button>
+        <button type="submit" class="btn-publish" style="padding:12px 18px;">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Modal: lista de usuarios baneados del chat (festival activo) -->
 <div id="chat-bans-modal" class="modal-backdrop" style="display:none;"
      onclick="if(event.target===event.currentTarget)closeBansModal();">
@@ -2417,6 +2553,10 @@ let feedRealtimeChannel = null;
 // first-load y hacemos loadPosts() normal.
 let lastFeedEventAt = null;
 let festivals = [];
+// Modo del modal de festival: null = crear, uuid = editar.
+// Se setea en openFestivalModal y se lee en saveFestival para
+// decidir entre INSERT y UPDATE.
+let _editingFestivalId = null;
 let refreshInterval = null;
 let editingPostId = null;  // null = modo nuevo; UUID = modo edición
 let currentChipcounts = [];  // [{ player_id, chip_count }] para la sección Chip Count
@@ -2671,7 +2811,12 @@ function showApp(user, adminName) {
 
 // ── FESTIVALS ─────────────────────────────────────────────────
 async function loadFestivals() {
-  const { data } = await sb.from('festivals').select('id,title,flag_emoji,is_live').order('starts_at', { ascending: false }).limit(20);
+  // Cargamos también country/starts_at/ends_at para reusar en el
+  // modal de edición sin tener que hacer un segundo fetch.
+  const { data } = await sb.from('festivals')
+    .select('id,title,flag_emoji,is_live,country,starts_at,ends_at')
+    .order('starts_at', { ascending: false })
+    .limit(20);
   festivals = data || [];
   const sel = document.getElementById('sel-festival');
   sel.innerHTML = '<option value="">— Selecciona festival —</option>';
@@ -2682,9 +2827,11 @@ async function loadFestivals() {
     if (f.is_live) opt.selected = true;
     sel.appendChild(opt);
   });
+  syncFestivalEditButton();
 }
 
 function onFestivalChange() {
+  syncFestivalEditButton();
   // Reset búsqueda + filtros + knownPostIds al cambiar de festival.
   // Así los posts del nuevo festival animan correctamente al entrar
   // y la lista de torneos del dropdown se reconstruye con los del
@@ -2716,6 +2863,151 @@ function onFestivalChange() {
   chatUnreadCount = 0;
   updateChatBadge();
   subscribeChatRealtime();
+}
+
+// ── FESTIVAL CRUD (admin) ────────────────────────────────────
+// Crear y editar festivales desde el panel del Feed. Las RLS
+// festivals_insert_admin / festivals_update_admin (migración
+// 20260427_festivals_admin_policies.sql) restringen a is_admin().
+
+// Mostrar/ocultar el botón "✎ Editar" según haya o no festival
+// seleccionado en el select. Llamado tras loadFestivals y al
+// inicio de onFestivalChange.
+function syncFestivalEditButton() {
+  const btn = document.getElementById('edit-festival-btn');
+  if (!btn) return;
+  const val = document.getElementById('sel-festival')?.value || '';
+  btn.style.display = val ? '' : 'none';
+}
+
+// Abre el modal en modo crear (festivalId null/'') o editar
+// (festivalId uuid). En editar, busca el festival en la variable
+// global `festivals` ya cargada por loadFestivals — sin fetch
+// adicional. Las fechas DATE de Postgres llegan como 'YYYY-MM-DD'
+// que es exactamente lo que un input type="date" acepta.
+function openFestivalModal(festivalId) {
+  _editingFestivalId = festivalId || null;
+  const titleEl = document.getElementById('festival-modal-title');
+  const fbEl    = document.getElementById('fest-feedback');
+  const $title    = document.getElementById('fest-title');
+  const $country  = document.getElementById('fest-country');
+  const $flag     = document.getElementById('fest-flag');
+  const $starts   = document.getElementById('fest-starts-at');
+  const $ends     = document.getElementById('fest-ends-at');
+  const $isLive   = document.getElementById('fest-is-live');
+
+  if (fbEl) { fbEl.style.display = 'none'; fbEl.textContent = ''; }
+
+  if (_editingFestivalId) {
+    const f = festivals.find(x => x.id === _editingFestivalId);
+    if (!f) {
+      // Festival no encontrado en cache (raro: select desincronizado).
+      // Abortamos en silencio en lugar de pintar formulario vacío con
+      // el id seteado, lo cual provocaría un UPDATE peligroso.
+      console.warn('openFestivalModal: festival no encontrado en cache', _editingFestivalId);
+      _editingFestivalId = null;
+      return;
+    }
+    titleEl.textContent = 'Editar festival';
+    $title.value   = f.title || '';
+    $country.value = f.country || '';
+    $flag.value    = f.flag_emoji || '';
+    $starts.value  = f.starts_at || '';
+    $ends.value    = f.ends_at || '';
+    $isLive.checked = !!f.is_live;
+  } else {
+    titleEl.textContent = 'Nuevo festival';
+    $title.value = '';
+    $country.value = '';
+    $flag.value = '';
+    $starts.value = '';
+    $ends.value = '';
+    $isLive.checked = false;
+  }
+  document.getElementById('festival-edit-modal').style.display = 'flex';
+  // Enfocar el primer input para flujo ágil.
+  setTimeout(() => $title.focus(), 50);
+}
+
+function closeFestivalModal() {
+  const m = document.getElementById('festival-edit-modal');
+  if (m) m.style.display = 'none';
+  // No limpiamos campos: openFestivalModal los reescribe siempre.
+}
+
+function showFestivalFeedback(msg, type) {
+  const el = document.getElementById('fest-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + (type || '');
+  el.style.display = 'block';
+}
+
+// INSERT en modo crear o UPDATE en modo editar. Tras crear, ofrece
+// activar el nuevo festival como activo del select; tras editar,
+// mantiene la selección actual y cierra el modal con un breve delay.
+async function saveFestival(event) {
+  if (event) event.preventDefault();
+  const title = document.getElementById('fest-title').value.trim();
+  if (!title) {
+    showFestivalFeedback('El nombre es obligatorio', 'err');
+    return;
+  }
+  const country = document.getElementById('fest-country').value.trim();
+  const flag    = document.getElementById('fest-flag').value.trim();
+  const starts  = document.getElementById('fest-starts-at').value;
+  const ends    = document.getElementById('fest-ends-at').value;
+  const isLive  = document.getElementById('fest-is-live').checked;
+
+  const payload = {
+    title,
+    country: country || null,
+    flag_emoji: flag || null,
+    starts_at: starts || null,
+    ends_at: ends || null,
+    is_live: isLive,
+  };
+
+  if (_editingFestivalId === null) {
+    // ── CREAR ──
+    const { data, error } = await sb.from('festivals')
+      .insert(payload)
+      .select('id')
+      .single();
+    if (error) {
+      showFestivalFeedback('Error al crear: ' + error.message, 'err');
+      return;
+    }
+    showFestivalFeedback('Festival creado', 'ok');
+    const newId = data?.id;
+    await loadFestivals();
+    // Cerramos antes del confirm para que el navegador lo muestre
+    // sin el modal por encima (UX más limpia).
+    closeFestivalModal();
+    if (newId && confirm('¿Activar este festival ahora?')) {
+      const sel = document.getElementById('sel-festival');
+      sel.value = newId;
+      onFestivalChange();
+    }
+  } else {
+    // ── EDITAR ──
+    const { error } = await sb.from('festivals')
+      .update(payload)
+      .eq('id', _editingFestivalId);
+    if (error) {
+      showFestivalFeedback('Error al actualizar: ' + error.message, 'err');
+      return;
+    }
+    showFestivalFeedback('Festival actualizado', 'ok');
+    // Mantener selección actual del select tras el reload (el reload
+    // resetea opciones y vuelve a auto-seleccionar el primer is_live).
+    const sel = document.getElementById('sel-festival');
+    const keepId = sel.value;
+    await loadFestivals();
+    if (keepId) sel.value = keepId;
+    syncFestivalEditButton();
+    setTimeout(closeFestivalModal, 700);
+  }
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -5357,15 +5649,17 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') login();
 });
 
-// Escape cierra modales abiertos (modal de edición de jugador y
-// modal de usuarios baneados del chat). Si en el futuro hay más,
-// añadir aquí cada par {selector, closeFn}.
+// Escape cierra modales abiertos (jugador, baneados del chat,
+// festival). Si en el futuro hay más, añadir aquí cada par
+// {selector, closeFn}.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   const playerModal = document.getElementById('player-edit-modal');
   if (playerModal && playerModal.style.display !== 'none') closePlayerEditModal();
   const bansModal = document.getElementById('chat-bans-modal');
   if (bansModal && bansModal.style.display !== 'none') closeBansModal();
+  const festModal = document.getElementById('festival-edit-modal');
+  if (festModal && festModal.style.display !== 'none') closeFestivalModal();
 });
 </script>
 </body>
