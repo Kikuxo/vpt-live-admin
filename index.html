@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #0a0c0f;
@@ -1972,6 +1973,102 @@
     cursor: pointer;
   }
 
+  /* ── MVP IMPORT: modal XLSX → festival_mvp_ranking vía RPC ── */
+  .mvp-import-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 4px 0 0 0;
+  }
+  .mvp-import-help {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .mvp-import-help strong {
+    color: var(--white);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+  }
+  #mvp-xlsx-file {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  /* Chips dorados con la lista de torneos detectados (columnas
+     extras tras las 5 fijas de la hoja TOTAL). */
+  .mvp-import-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .mvp-import-info .chip-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-right: 4px;
+  }
+  .mvp-import-info .chip {
+    padding: 4px 10px;
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    border-radius: 12px;
+    color: var(--gold);
+    background: rgba(201, 168, 76, 0.08);
+    font-size: 11px;
+  }
+  /* Stats: línea horizontal con métricas separadas por · */
+  .mvp-import-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    flex-wrap: wrap;
+  }
+  .mvp-import-stats strong {
+    color: var(--white);
+    font-weight: 600;
+  }
+  /* Tabla preview: scroll vertical limitado, header sticky dorado. */
+  .mvp-import-preview {
+    max-height: 280px;
+    overflow: auto;
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .mvp-import-preview table {
+    width: 100%;
+    font-size: 11px;
+    border-collapse: collapse;
+  }
+  .mvp-import-preview th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    padding: 6px 8px;
+    text-align: left;
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .3px;
+    border-bottom: 1px solid var(--border2);
+    white-space: nowrap;
+  }
+  .mvp-import-preview td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--white);
+    white-space: nowrap;
+  }
+  .mvp-import-preview tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
   /* Toggle "Mostrar archivados" en .festival-actions: empujado a la
      derecha con margin-left:auto, estilo discreto. */
   .show-archived-toggle {
@@ -2237,6 +2334,9 @@
         <button class="btn-mini" id="edit-festival-btn" type="button"
                 onclick="openFestivalModal(document.getElementById('sel-festival').value)"
                 style="display:none;">✎ Editar</button>
+        <button class="btn-mini" id="import-mvp-btn" type="button"
+                onclick="openMvpImportModal(document.getElementById('sel-festival').value)"
+                style="display:none;">📊 Importar MVP</button>
         <label class="show-archived-toggle">
           <input id="show-archived-cb" type="checkbox" onchange="toggleShowArchived()" />
           <span>Mostrar archivados 📦</span>
@@ -2630,6 +2730,39 @@
   </div>
 </div>
 
+<!-- Modal: importar MVP del festival vía XLSX (SheetJS) -->
+<div id="mvp-import-modal" class="modal-backdrop" style="display:none;"
+     onclick="if(event.target===event.currentTarget)closeMvpImportModal();">
+  <div class="modal" onclick="event.stopPropagation();" style="width:680px; max-width:96vw;">
+    <div class="modal-header">
+      <div class="modal-title">Importar MVP del festival</div>
+      <button class="btn-logout" onclick="closeMvpImportModal()" title="Cerrar">✕</button>
+    </div>
+    <div class="mvp-import-body">
+      <p class="mvp-import-help">
+        Sube el archivo XLSX del MVP. Lee automáticamente las hojas
+        <strong>TOTAL</strong> y <strong>PRIZES</strong>. Solo importa
+        jugadores con todos los campos obligatorios. La importación
+        reemplaza el ranking existente del festival (DELETE + INSERT
+        atómico vía RPC).
+      </p>
+      <input id="mvp-xlsx-file" type="file" accept=".xlsx,.xls"
+             onchange="onMvpFileChange(event)" />
+      <div id="mvp-import-info" class="mvp-import-info" style="display:none;"></div>
+      <div id="mvp-import-stats" class="mvp-import-stats" style="display:none;"></div>
+      <div id="mvp-import-preview" class="mvp-import-preview" style="display:none;"></div>
+      <div id="mvp-import-feedback" class="publish-feedback" style="display:none;"></div>
+      <div class="modal-actions">
+        <div style="flex:1;"></div>
+        <button type="button" class="btn-secondary" onclick="closeMvpImportModal()">Cancelar</button>
+        <button type="button" id="mvp-import-submit" class="btn-publish"
+                style="padding:12px 18px;" disabled
+                onclick="uploadMvpRanking()">Subir y reemplazar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: lista de usuarios baneados del chat (festival activo) -->
 <div id="chat-bans-modal" class="modal-backdrop" style="display:none;"
      onclick="if(event.target===event.currentTarget)closeBansModal();">
@@ -3015,10 +3148,12 @@ async function loadFestivals() {
     sel.appendChild(opt);
   });
   syncFestivalEditButton();
+  syncImportMvpButton();
 }
 
 function onFestivalChange() {
   syncFestivalEditButton();
+  syncImportMvpButton();
   // Reset búsqueda + filtros + knownPostIds al cambiar de festival.
   // Así los posts del nuevo festival animan correctamente al entrar
   // y la lista de torneos del dropdown se reconstruye con los del
@@ -3342,6 +3477,403 @@ async function unarchiveFestival() {
   await loadFestivals();
   if (keepId) sel.value = keepId;
   syncFestivalEditButton();
+}
+
+// ── MVP IMPORT (admin → festival_mvp_ranking vía XLSX + RPC) ──
+// SheetJS lee el XLSX cliente-side. Dos hojas obligatorias:
+//   · TOTAL  → 1 fila por jugador con CLUB/POS/NAME/COUNTRY/TOTAL
+//              + 12 columnas de torneos dinámicos
+//   · PRIZES → top 10 con POSITION/PRIZES/VALUE/WINNERS, vincula
+//              por POSITION y produce el campo prize concatenado
+// La importación reemplaza el ranking del festival (RPC
+// replace_festival_mvp_ranking hace DELETE + INSERT atómico).
+
+let _mvpImportRows = null;
+let _mvpImportFestivalId = null;
+let _mvpImportTournaments = [];
+let _mvpImportStats = null;
+
+// Lookup de país: nombres en inglés (formato Excel) → ISO 3166-1
+// alpha-2. Lista esencial cubriendo torneos VPT y comunes en el
+// circuito europeo. Para nombres no listados devuelve null y la
+// fila se importa sin bandera (queda visible en stats).
+const COUNTRY_NAME_TO_ISO = {
+  'spain': 'ES',
+  'portugal': 'PT',
+  'italy': 'IT',
+  'france': 'FR',
+  'germany': 'DE',
+  'uk': 'GB',
+  'united kingdom': 'GB',
+  'great britain': 'GB',
+  'ireland': 'IE',
+  'netherlands': 'NL',
+  'belgium': 'BE',
+  'czech republic': 'CZ',
+  'czechia': 'CZ',
+  'slovakia': 'SK',
+  'hungary': 'HU',
+  'poland': 'PL',
+  'romania': 'RO',
+  'bulgaria': 'BG',
+  'austria': 'AT',
+  'switzerland': 'CH',
+  'greece': 'GR',
+  'cyprus': 'CY',
+  'turkey': 'TR',
+  'israel': 'IL',
+  'usa': 'US',
+  'united states': 'US',
+  'us': 'US',
+  'canada': 'CA',
+  'mexico': 'MX',
+  'brazil': 'BR',
+  'argentina': 'AR',
+  'chile': 'CL',
+  'colombia': 'CO',
+  'peru': 'PE',
+  'venezuela': 'VE',
+  'uruguay': 'UY',
+  'paraguay': 'PY',
+  'kosovo': 'XK',
+  'serbia': 'RS',
+  'croatia': 'HR',
+  'slovenia': 'SI',
+  'bosnia and herzegovina': 'BA',
+  'macedonia': 'MK',
+  'north macedonia': 'MK',
+  'albania': 'AL',
+  'montenegro': 'ME',
+  'russia': 'RU',
+  'ukraine': 'UA',
+  'belarus': 'BY',
+  'lithuania': 'LT',
+  'latvia': 'LV',
+  'estonia': 'EE',
+  'finland': 'FI',
+  'sweden': 'SE',
+  'norway': 'NO',
+  'denmark': 'DK',
+  'iceland': 'IS',
+  'malta': 'MT',
+  'luxembourg': 'LU',
+  'morocco': 'MA',
+  'tunisia': 'TN',
+  'algeria': 'DZ',
+  'egypt': 'EG',
+  'south africa': 'ZA',
+  'china': 'CN',
+  'japan': 'JP',
+  'south korea': 'KR',
+  'india': 'IN',
+  'australia': 'AU',
+  'new zealand': 'NZ',
+};
+
+function lookupCountryIso(name) {
+  if (name == null) return null;
+  const key = String(name).trim().toLowerCase();
+  if (!key) return null;
+  return COUNTRY_NAME_TO_ISO[key] || null;
+}
+
+// Mostrar/ocultar el botón "📊 Importar MVP" según value del select.
+function syncImportMvpButton() {
+  const btn = document.getElementById('import-mvp-btn');
+  if (!btn) return;
+  const val = document.getElementById('sel-festival')?.value || '';
+  btn.style.display = val ? '' : 'none';
+}
+
+function openMvpImportModal(festivalId) {
+  if (!festivalId) return; // defensivo: el sync ya lo oculta
+  _mvpImportFestivalId = festivalId;
+  _mvpImportRows = null;
+  _mvpImportTournaments = [];
+  _mvpImportStats = null;
+  // Reset UI
+  const file = document.getElementById('mvp-xlsx-file');
+  if (file) file.value = '';
+  const info = document.getElementById('mvp-import-info');
+  if (info) { info.style.display = 'none'; info.innerHTML = ''; }
+  const stats = document.getElementById('mvp-import-stats');
+  if (stats) { stats.style.display = 'none'; stats.innerHTML = ''; }
+  const preview = document.getElementById('mvp-import-preview');
+  if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+  const fb = document.getElementById('mvp-import-feedback');
+  if (fb) { fb.style.display = 'none'; fb.textContent = ''; fb.className = 'publish-feedback'; }
+  const submit = document.getElementById('mvp-import-submit');
+  if (submit) submit.disabled = true;
+  document.getElementById('mvp-import-modal').style.display = 'flex';
+}
+
+function closeMvpImportModal() {
+  const m = document.getElementById('mvp-import-modal');
+  if (m) m.style.display = 'none';
+  _mvpImportRows = null;
+  _mvpImportFestivalId = null;
+  _mvpImportTournaments = [];
+  _mvpImportStats = null;
+}
+
+function showMvpImportFeedback(msg, type) {
+  const el = document.getElementById('mvp-import-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + (type || '');
+  el.style.display = 'block';
+}
+
+// Lee un File como ArrayBuffer (necesario para XLSX.read).
+function _readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function onMvpFileChange(event) {
+  const file = event.target.files && event.target.files[0];
+  const submit = document.getElementById('mvp-import-submit');
+  if (submit) submit.disabled = true;
+  if (!file) return;
+  if (typeof XLSX === 'undefined') {
+    showMvpImportFeedback('SheetJS no está cargado. Recarga la página.', 'err');
+    return;
+  }
+
+  let wb;
+  try {
+    const buf = await _readFileAsArrayBuffer(file);
+    wb = XLSX.read(buf, { type: 'array' });
+  } catch (e) {
+    showMvpImportFeedback('No se pudo leer el archivo: ' + (e?.message || e), 'err');
+    return;
+  }
+
+  if (!wb.SheetNames.includes('TOTAL')) {
+    showMvpImportFeedback('El archivo no contiene hoja TOTAL', 'err');
+    return;
+  }
+
+  // ── Hoja TOTAL ──
+  const wsTotal = wb.Sheets['TOTAL'];
+  const dataTotal = XLSX.utils.sheet_to_json(wsTotal, { header: 1, defval: '' });
+  if (dataTotal.length < 2) {
+    showMvpImportFeedback('La hoja TOTAL no tiene filas de datos', 'err');
+    return;
+  }
+  const headers = dataTotal[0].map(h => String(h ?? '').trim());
+  // Cabeceras esperadas en orden: CLUB, POS, NAME, COUNTRY, TOTAL,
+  // luego N columnas de torneos. Validamos las 5 fijas.
+  const expected = ['CLUB', 'POS', 'NAME', 'COUNTRY', 'TOTAL'];
+  for (let i = 0; i < expected.length; i++) {
+    if ((headers[i] || '').toUpperCase() !== expected[i]) {
+      showMvpImportFeedback(
+        `Cabecera incorrecta en columna ${i + 1}: esperaba "${expected[i]}", encontrado "${headers[i] || ''}"`,
+        'err'
+      );
+      return;
+    }
+  }
+  // Torneos = todas las cabeceras desde el índice 5, no vacías,
+  // conservando capitalización original del Excel para mostrar.
+  _mvpImportTournaments = headers
+    .slice(5)
+    .map(h => String(h || '').trim())
+    .filter(h => h !== '');
+
+  // Procesar filas TOTAL
+  const out = [];
+  let unknownCountry = 0;
+  for (let r = 1; r < dataTotal.length; r++) {
+    const row = dataTotal[r];
+    if (!row || row.every(c => c === '' || c == null)) continue;
+    const posRaw = row[1];
+    const nameRaw = row[2];
+    const countryRaw = row[3];
+    const totalRaw = row[4];
+    const position = parseInt(posRaw, 10);
+    if (isNaN(position)) continue; // skip filas sin POS válido
+    const name = String(nameRaw ?? '').trim();
+    if (!name) continue; // skip filas sin nombre
+    const totalPoints = parseFloat(totalRaw);
+    if (isNaN(totalPoints)) continue; // skip filas sin TOTAL numérico
+    const countryIso = lookupCountryIso(countryRaw);
+    if (!countryIso) unknownCountry++;
+    // Torneos: solo los con valor numérico > 0.
+    const tournaments = [];
+    for (let t = 0; t < _mvpImportTournaments.length; t++) {
+      const cell = row[5 + t];
+      if (cell === '' || cell == null) continue;
+      const pts = parseFloat(cell);
+      if (isNaN(pts) || pts <= 0) continue;
+      tournaments.push({ name: _mvpImportTournaments[t], points: pts });
+    }
+    out.push({
+      position,
+      name,
+      country_iso: countryIso, // null si no encontrado
+      total_points: totalPoints,
+      tournaments: tournaments.length > 0 ? { tournaments } : null,
+      prize: null, // se rellena si hay hoja PRIZES
+    });
+  }
+
+  if (out.length === 0) {
+    showMvpImportFeedback('La hoja TOTAL no tiene filas válidas (POS + NAME + TOTAL)', 'err');
+    return;
+  }
+
+  // ── Hoja PRIZES (opcional) ──
+  let prizesAttached = 0;
+  if (wb.SheetNames.includes('PRIZES')) {
+    const wsP = wb.Sheets['PRIZES'];
+    const dataP = XLSX.utils.sheet_to_json(wsP, { header: 1, defval: '' });
+    // Cabeceras esperadas: POSITION, PRIZES, VALUE, WINNERS (al menos 3).
+    if (dataP.length >= 2) {
+      // Mapa position → fila out, para vincular en O(N) total.
+      const byPos = new Map();
+      out.forEach(o => byPos.set(o.position, o));
+      for (let r = 1; r < dataP.length; r++) {
+        const row = dataP[r];
+        if (!row || row.every(c => c === '' || c == null)) continue;
+        const pos = parseInt(row[0], 10);
+        if (isNaN(pos)) continue;
+        const desc = String(row[1] ?? '').trim();
+        const valueRaw = row[2];
+        const value = parseFloat(valueRaw);
+        if (!desc && isNaN(value)) continue;
+        let prizeStr;
+        if (!isNaN(value) && desc) {
+          prizeStr = `€${value} - ${desc}`;
+        } else if (!isNaN(value)) {
+          prizeStr = `€${value}`;
+        } else {
+          prizeStr = desc;
+        }
+        const target = byPos.get(pos);
+        if (target) {
+          target.prize = prizeStr;
+          prizesAttached++;
+        }
+      }
+    }
+  }
+
+  _mvpImportRows = out;
+  _mvpImportStats = {
+    total: out.length,
+    unknownCountry,
+    prizesAttached,
+  };
+
+  // ── Render: chips, stats, preview, feedback ──
+  const info = document.getElementById('mvp-import-info');
+  info.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'chip-label';
+  label.textContent = 'Torneos detectados:';
+  info.appendChild(label);
+  if (_mvpImportTournaments.length === 0) {
+    const none = document.createElement('span');
+    none.className = 'chip';
+    none.style.opacity = '.6';
+    none.textContent = 'ninguno';
+    info.appendChild(none);
+  } else {
+    _mvpImportTournaments.forEach(t => {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = t;
+      info.appendChild(c);
+    });
+  }
+  info.style.display = '';
+
+  const stats = document.getElementById('mvp-import-stats');
+  stats.innerHTML = '';
+  const mk = (label, value) => {
+    const span = document.createElement('span');
+    const b = document.createElement('strong');
+    b.textContent = String(value);
+    span.appendChild(b);
+    span.appendChild(document.createTextNode(' ' + label));
+    return span;
+  };
+  stats.appendChild(mk('jugadores válidos', _mvpImportStats.total));
+  stats.appendChild(document.createTextNode('·'));
+  stats.appendChild(mk('con país desconocido', _mvpImportStats.unknownCountry));
+  stats.appendChild(document.createTextNode('·'));
+  stats.appendChild(mk('con premio', _mvpImportStats.prizesAttached));
+  stats.style.display = '';
+
+  // Preview: primeras 10 filas con createElement+textContent
+  // (defensa contra contenido arbitrario del XLSX).
+  const preview = document.getElementById('mvp-import-preview');
+  preview.innerHTML = '';
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const trh = document.createElement('tr');
+  ['#', 'Nombre', 'País', 'Total', 'Torneos', 'Premio'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    trh.appendChild(th);
+  });
+  thead.appendChild(trh);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  out.slice(0, 10).forEach(o => {
+    const tr = document.createElement('tr');
+    [
+      String(o.position),
+      o.name,
+      o.country_iso || '—',
+      String(o.total_points),
+      o.tournaments
+        ? `${o.tournaments.tournaments.length} torneos`
+        : '—',
+      o.prize || '—',
+    ].forEach(v => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  preview.appendChild(table);
+  preview.style.display = '';
+
+  const msg = unknownCountry > 0
+    ? `${out.length} jugadores listos para subir. Aviso: ${unknownCountry} sin bandera (país no reconocido).`
+    : `${out.length} jugadores listos para subir.`;
+  showMvpImportFeedback(msg, 'ok');
+  if (submit) submit.disabled = false;
+}
+
+async function uploadMvpRanking() {
+  if (!_mvpImportRows || !_mvpImportFestivalId) return;
+  const submit = document.getElementById('mvp-import-submit');
+  if (submit) submit.disabled = true;
+  showMvpImportFeedback('Subiendo...', '');
+  const { error } = await sb.rpc('replace_festival_mvp_ranking', {
+    p_festival_id: _mvpImportFestivalId,
+    p_rows: _mvpImportRows,
+  });
+  if (error) {
+    showMvpImportFeedback('Error al importar: ' + error.message, 'err');
+    if (submit) submit.disabled = false;
+    return;
+  }
+  const n = _mvpImportRows.length;
+  showMvpImportFeedback(
+    `MVP del festival importado: ${n} jugador${n === 1 ? '' : 'es'}`,
+    'ok'
+  );
+  setTimeout(closeMvpImportModal, 1500);
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
@@ -6048,8 +6580,8 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
 });
 
 // Escape cierra modales abiertos (jugador, baneados del chat,
-// festival, prompt de ban). Si en el futuro hay más, añadir aquí
-// cada par {selector, closeFn}.
+// festival, prompt de ban, importación MVP). Si en el futuro hay
+// más, añadir aquí cada par {selector, closeFn}.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   const playerModal = document.getElementById('player-edit-modal');
@@ -6060,6 +6592,8 @@ document.addEventListener('keydown', e => {
   if (festModal && festModal.style.display !== 'none') closeFestivalModal();
   const banPromptModal = document.getElementById('ban-prompt-modal');
   if (banPromptModal && banPromptModal.style.display !== 'none') closeBanPromptModal();
+  const mvpImportModal = document.getElementById('mvp-import-modal');
+  if (mvpImportModal && mvpImportModal.style.display !== 'none') closeMvpImportModal();
 });
 </script>
 </body>
