@@ -2335,8 +2335,8 @@
                 onclick="openFestivalModal(document.getElementById('sel-festival').value)"
                 style="display:none;">✎ Editar</button>
         <button class="btn-mini" id="import-mvp-btn" type="button"
-                onclick="openMvpImportModal(document.getElementById('sel-festival').value)"
-                style="display:none;">📊 Importar MVP</button>
+                onclick="openMvpRankingModal(document.getElementById('sel-festival').value)"
+                style="display:none;">📊 Ranking MVP</button>
         <label class="show-archived-toggle">
           <input id="show-archived-cb" type="checkbox" onchange="toggleShowArchived()" />
           <span>Mostrar archivados 📦</span>
@@ -2730,15 +2730,36 @@
   </div>
 </div>
 
-<!-- Modal: importar MVP del festival vía XLSX (SheetJS) -->
+<!-- Modal: gestión del ranking MVP del festival.
+     Dos vistas: panel (metadata + acciones + preview) y upload (XLSX
+     + SheetJS). Se alternan con display:none, no son modales separados. -->
 <div id="mvp-import-modal" class="modal-backdrop" style="display:none;"
      onclick="if(event.target===event.currentTarget)closeMvpImportModal();">
   <div class="modal" onclick="event.stopPropagation();" style="width:680px; max-width:96vw;">
     <div class="modal-header">
-      <div class="modal-title">Importar MVP del festival</div>
+      <div class="modal-title" id="mvp-modal-title">Ranking MVP del festival</div>
       <button class="btn-logout" onclick="closeMvpImportModal()" title="Cerrar">✕</button>
     </div>
-    <div class="mvp-import-body">
+
+    <!-- Vista 1: panel (default al abrir) -->
+    <div id="mvp-panel-view" class="mvp-import-body">
+      <div id="mvp-panel-meta" class="mvp-import-stats"
+           style="display:flex;"></div>
+      <div id="mvp-panel-feedback" class="publish-feedback" style="display:none;"></div>
+      <div id="mvp-panel-preview" class="mvp-import-preview" style="display:none;"></div>
+      <div class="modal-actions">
+        <div style="flex:1;"></div>
+        <button type="button" id="mvp-panel-delete-btn" class="btn-secondary"
+                style="display:none;border-color:var(--red);color:var(--red);"
+                onclick="deleteMvpRanking()">🗑 Eliminar ranking</button>
+        <button type="button" class="btn-publish"
+                style="padding:12px 18px;"
+                onclick="goToMvpUpload()">📤 Subir nuevo Excel</button>
+      </div>
+    </div>
+
+    <!-- Vista 2: upload (subida XLSX, contenido del modal anterior) -->
+    <div id="mvp-upload-view" class="mvp-import-body" style="display:none;">
       <p class="mvp-import-help">
         Sube el archivo XLSX del MVP. Lee automáticamente las hojas
         <strong>TOTAL</strong> y <strong>PRIZES</strong>. Solo importa
@@ -2746,6 +2767,8 @@
         reemplaza el ranking existente del festival (DELETE + INSERT
         atómico vía RPC).
       </p>
+      <div id="mvp-upload-replace-warning" class="publish-feedback"
+           style="display:none;background:rgba(240,133,42,.12);border:1px solid rgba(240,133,42,.3);color:var(--orange);"></div>
       <input id="mvp-xlsx-file" type="file" accept=".xlsx,.xls"
              onchange="onMvpFileChange(event)" />
       <div id="mvp-import-info" class="mvp-import-info" style="display:none;"></div>
@@ -2753,6 +2776,7 @@
       <div id="mvp-import-preview" class="mvp-import-preview" style="display:none;"></div>
       <div id="mvp-import-feedback" class="publish-feedback" style="display:none;"></div>
       <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="goToMvpPanel()">← Volver</button>
         <div style="flex:1;"></div>
         <button type="button" class="btn-secondary" onclick="closeMvpImportModal()">Cancelar</button>
         <button type="button" id="mvp-import-submit" class="btn-publish"
@@ -3585,13 +3609,18 @@ function syncImportMvpButton() {
   btn.style.display = val ? '' : 'none';
 }
 
-function openMvpImportModal(festivalId) {
-  if (!festivalId) return; // defensivo: el sync ya lo oculta
-  _mvpImportFestivalId = festivalId;
+// Estado del panel: metadata de la última subida (festival_mvp_uploads)
+// y top-10 del ranking actual para preview. Se rellenan al abrir el
+// modal y tras cada upload/delete exitoso.
+let _mvpCurrentMeta = null;
+let _mvpCurrentRows = null;
+let _mvpFestivalTitle = '';
+
+// Resetea inputs/estado de la sub-vista de upload (no toca el panel).
+function _resetMvpUploadView() {
   _mvpImportRows = null;
   _mvpImportTournaments = [];
   _mvpImportStats = null;
-  // Reset UI
   const file = document.getElementById('mvp-xlsx-file');
   if (file) file.value = '';
   const info = document.getElementById('mvp-import-info');
@@ -3604,7 +3633,76 @@ function openMvpImportModal(festivalId) {
   if (fb) { fb.style.display = 'none'; fb.textContent = ''; fb.className = 'publish-feedback'; }
   const submit = document.getElementById('mvp-import-submit');
   if (submit) submit.disabled = true;
+}
+
+// Punto de entrada: abre el modal en modo panel y carga metadata+ranking.
+async function openMvpRankingModal(festivalId) {
+  if (!festivalId) return; // defensivo: el sync ya oculta el botón
+  _mvpImportFestivalId = festivalId;
+  _mvpCurrentMeta = null;
+  _mvpCurrentRows = null;
+  _mvpFestivalTitle = (festivals.find(f => f.id === festivalId)?.title) || '';
+  _resetMvpUploadView();
+  goToMvpPanel();
   document.getElementById('mvp-import-modal').style.display = 'flex';
+  // Render inicial mientras llega la data: skeleton "Cargando..."
+  const meta = document.getElementById('mvp-panel-meta');
+  if (meta) meta.innerHTML = '<span style="color:var(--muted);">Cargando…</span>';
+  const preview = document.getElementById('mvp-panel-preview');
+  if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+  await loadMvpFestivalData(festivalId);
+  renderMvpPanel();
+}
+
+// Lee en paralelo metadata (festival_mvp_uploads) y top-10 del ranking.
+async function loadMvpFestivalData(festivalId) {
+  const [metaRes, rowsRes] = await Promise.all([
+    sb.from('festival_mvp_uploads')
+      .select('festival_id,uploaded_at,uploaded_by,uploaded_by_email,rows_count')
+      .eq('festival_id', festivalId)
+      .maybeSingle(),
+    sb.from('festival_mvp_ranking')
+      .select('position,name,country_iso,total_points,prize')
+      .eq('festival_id', festivalId)
+      .order('position', { ascending: true })
+      .limit(10),
+  ]);
+  _mvpCurrentMeta = metaRes.data || null;
+  _mvpCurrentRows = rowsRes.data || [];
+}
+
+// Cambia a la vista panel (metadata + acciones + preview).
+function goToMvpPanel() {
+  const panel = document.getElementById('mvp-panel-view');
+  const upload = document.getElementById('mvp-upload-view');
+  const title = document.getElementById('mvp-modal-title');
+  if (panel) panel.style.display = '';
+  if (upload) upload.style.display = 'none';
+  if (title) title.textContent = 'Ranking MVP del festival';
+}
+
+// Cambia a la vista upload (XLSX + SheetJS). Limpia inputs previos y
+// pinta el aviso de reemplazo si ya hay ranking cargado.
+function goToMvpUpload() {
+  _resetMvpUploadView();
+  const panel = document.getElementById('mvp-panel-view');
+  const upload = document.getElementById('mvp-upload-view');
+  const title = document.getElementById('mvp-modal-title');
+  if (panel) panel.style.display = 'none';
+  if (upload) upload.style.display = '';
+  if (title) title.textContent = 'Subir nuevo ranking MVP';
+  // Aviso de reemplazo: solo si ya hay metadata previa.
+  const warn = document.getElementById('mvp-upload-replace-warning');
+  if (warn) {
+    if (_mvpCurrentMeta && _mvpCurrentMeta.rows_count > 0) {
+      const dt = formatSpanishDateTime(_mvpCurrentMeta.uploaded_at);
+      warn.textContent = `⚠ Esto sustituirá las ${_mvpCurrentMeta.rows_count} filas actuales (subidas el ${dt}).`;
+      warn.style.display = 'block';
+    } else {
+      warn.style.display = 'none';
+      warn.textContent = '';
+    }
+  }
 }
 
 function closeMvpImportModal() {
@@ -3614,6 +3712,146 @@ function closeMvpImportModal() {
   _mvpImportFestivalId = null;
   _mvpImportTournaments = [];
   _mvpImportStats = null;
+  _mvpCurrentMeta = null;
+  _mvpCurrentRows = null;
+  _mvpFestivalTitle = '';
+}
+
+// Formato "27 abr 2026 a las 17:34" desde ISO. Meses abreviados ES.
+function formatSpanishDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const day = d.getDate();
+  const mon = months[d.getMonth()];
+  const year = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${day} ${mon} ${year} a las ${hh}:${mm}`;
+}
+
+// Pinta la vista panel: metadata + (opcional) preview top-10 + visibilidad
+// del botón "Eliminar ranking".
+function renderMvpPanel() {
+  const meta = document.getElementById('mvp-panel-meta');
+  const preview = document.getElementById('mvp-panel-preview');
+  const delBtn = document.getElementById('mvp-panel-delete-btn');
+  const fb = document.getElementById('mvp-panel-feedback');
+  if (fb) { fb.style.display = 'none'; fb.textContent = ''; fb.className = 'publish-feedback'; }
+  const hasRanking = !!_mvpCurrentMeta && _mvpCurrentRows && _mvpCurrentRows.length > 0;
+
+  // Metadata (línea horizontal con · separador, mismo estilo que stats)
+  if (meta) {
+    meta.innerHTML = '';
+    if (hasRanking) {
+      const dt = formatSpanishDateTime(_mvpCurrentMeta.uploaded_at);
+      const email = _mvpCurrentMeta.uploaded_by_email || '—';
+      const n = _mvpCurrentMeta.rows_count;
+      const mk = (label, value) => {
+        const span = document.createElement('span');
+        const b = document.createElement('strong');
+        b.textContent = String(value);
+        span.appendChild(document.createTextNode(label + ' '));
+        span.appendChild(b);
+        return span;
+      };
+      meta.appendChild(mk('Última subida:', dt));
+      meta.appendChild(document.createTextNode('·'));
+      meta.appendChild(mk('', `${n} jugador${n === 1 ? '' : 'es'}`));
+      meta.appendChild(document.createTextNode('·'));
+      meta.appendChild(mk('subido por', email));
+    } else {
+      const span = document.createElement('span');
+      span.style.color = 'var(--muted)';
+      span.textContent = 'Sin ranking cargado';
+      meta.appendChild(span);
+    }
+  }
+
+  // Botón eliminar: visible solo si hay ranking
+  if (delBtn) delBtn.style.display = hasRanking ? '' : 'none';
+
+  // Preview top-10
+  if (preview) {
+    preview.innerHTML = '';
+    if (!hasRanking) {
+      preview.style.display = 'none';
+      return;
+    }
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    ['#', 'Jugador', 'Puntos', 'Premio'].forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    _mvpCurrentRows.forEach(r => {
+      const tr = document.createElement('tr');
+      // # posición
+      const tdPos = document.createElement('td');
+      tdPos.textContent = String(r.position);
+      tr.appendChild(tdPos);
+      // Nombre + bandera (emoji si ISO válido, code crudo si no)
+      const tdName = document.createElement('td');
+      const flag = r.country_iso ? isoFlagEmoji(r.country_iso) : '';
+      const flagStr = flag || (r.country_iso ? r.country_iso : '');
+      tdName.textContent = flagStr ? `${flagStr} ${r.name}` : r.name;
+      tr.appendChild(tdName);
+      // Puntos
+      const tdPts = document.createElement('td');
+      tdPts.textContent = String(r.total_points);
+      tr.appendChild(tdPts);
+      // Premio
+      const tdPrize = document.createElement('td');
+      tdPrize.textContent = r.prize || '—';
+      tr.appendChild(tdPrize);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    preview.appendChild(table);
+    preview.style.display = '';
+  }
+}
+
+function showMvpPanelFeedback(msg, type) {
+  const el = document.getElementById('mvp-panel-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + (type || '');
+  el.style.display = 'block';
+}
+
+// Borra ranking + metadata vía RPC. Confirm con título del festival y
+// número de filas actuales. Tras éxito refresca el panel.
+async function deleteMvpRanking() {
+  if (!_mvpImportFestivalId || !_mvpCurrentMeta) return;
+  const n = _mvpCurrentMeta.rows_count;
+  const title = _mvpFestivalTitle || 'este festival';
+  const ok = confirm(
+    `¿Eliminar el ranking MVP de ${title} (${n} jugador${n === 1 ? '' : 'es'})? ` +
+    `Esta acción no se puede deshacer.`
+  );
+  if (!ok) return;
+  const delBtn = document.getElementById('mvp-panel-delete-btn');
+  if (delBtn) delBtn.disabled = true;
+  showMvpPanelFeedback('Eliminando…', '');
+  const { error } = await sb.rpc('delete_festival_mvp_ranking', {
+    p_festival_id: _mvpImportFestivalId,
+  });
+  if (delBtn) delBtn.disabled = false;
+  if (error) {
+    showMvpPanelFeedback('Error al eliminar: ' + error.message, 'err');
+    return;
+  }
+  _mvpCurrentMeta = null;
+  _mvpCurrentRows = [];
+  renderMvpPanel();
+  showMvpPanelFeedback('Ranking MVP eliminado.', 'ok');
 }
 
 function showMvpImportFeedback(msg, type) {
@@ -3873,7 +4111,17 @@ async function uploadMvpRanking() {
     `MVP del festival importado: ${n} jugador${n === 1 ? '' : 'es'}`,
     'ok'
   );
-  setTimeout(closeMvpImportModal, 1500);
+  // Refrescar metadata + ranking y volver a la vista panel para que el
+  // admin vea inmediatamente el nuevo top-10 + última subida actualizada.
+  await loadMvpFestivalData(_mvpImportFestivalId);
+  setTimeout(() => {
+    goToMvpPanel();
+    renderMvpPanel();
+    showMvpPanelFeedback(
+      `Ranking actualizado: ${n} jugador${n === 1 ? '' : 'es'}`,
+      'ok'
+    );
+  }, 900);
 }
 
 // ── POSTS ─────────────────────────────────────────────────────
