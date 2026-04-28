@@ -4156,6 +4156,67 @@ function extractTournamentNumber(name) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+// Lee la hoja TOP10 del XLSX si existe (acepta variantes "TOP 10",
+// "Top10", etc. — match whitespace-insensitive). El shape es idéntico
+// al de TOTAL: cabeceras CLUB/POS/NAME/COUNTRY/TOTAL + 12 columnas de
+// torneos. Solo se listan socios del Club VPT con sus 10 mejores
+// resultados; el resto de columnas de torneos quedan vacías.
+//
+// Devuelve un Map<nameLowercased, {top10_position, top10_points,
+// top10_tournaments}> o null si la hoja no existe / no es válida.
+// El caller usa el map para inyectar los campos top10_* en cada
+// jugador de TOTAL que matchee por nombre normalizado.
+function readTop10Sheet(wb) {
+  const sheetName = wb.SheetNames.find(
+    n => n.replace(/\s+/g, '').toUpperCase() === 'TOP10'
+  );
+  if (!sheetName) return null;
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return null;
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (data.length < 2) return null;
+  const headers = data[0].map(h => String(h ?? '').trim());
+  // Mismas cabeceras fijas que TOTAL en las primeras 5 columnas.
+  // Si no cuadran, devolvemos null y el caller cae al fallback
+  // (vinculación de premios por position de TOTAL).
+  const expected = ['CLUB', 'POS', 'NAME', 'COUNTRY', 'TOTAL'];
+  for (let i = 0; i < expected.length; i++) {
+    if ((headers[i] || '').toUpperCase() !== expected[i]) return null;
+  }
+  const tournamentHeaders = headers
+    .slice(5)
+    .map(h => String(h || '').trim())
+    .filter(h => h !== '');
+  const map = new Map();
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    if (!row || row.every(c => c === '' || c == null)) continue;
+    const top10Position = parseInt(row[1], 10);
+    if (isNaN(top10Position)) continue;
+    const name = String(row[2] ?? '').trim();
+    if (!name) continue;
+    const top10Points = parseFloat(row[4]);
+    if (isNaN(top10Points)) continue;
+    // Torneos: solo los con valor numérico > 0 (los 10 que cuentan
+    // para el TOP 10; los otros 2 quedan vacíos).
+    const t10Tournaments = [];
+    for (let t = 0; t < tournamentHeaders.length; t++) {
+      const cell = row[5 + t];
+      if (cell === '' || cell == null) continue;
+      const pts = parseFloat(cell);
+      if (isNaN(pts) || pts <= 0) continue;
+      t10Tournaments.push({ name: tournamentHeaders[t], points: pts });
+    }
+    map.set(name.toLowerCase(), {
+      top10_position: top10Position,
+      top10_points: top10Points,
+      top10_tournaments:
+        t10Tournaments.length > 0 ? { tournaments: t10Tournaments } : null,
+    });
+  }
+  return map;
+}
+
 async function onMvpFileChange(event) {
   const file = event.target.files && event.target.files[0];
   const submit = document.getElementById('mvp-import-submit');
@@ -4213,6 +4274,7 @@ async function onMvpFileChange(event) {
   for (let r = 1; r < dataTotal.length; r++) {
     const row = dataTotal[r];
     if (!row || row.every(c => c === '' || c == null)) continue;
+    const clubRaw = row[0];
     const posRaw = row[1];
     const nameRaw = row[2];
     const countryRaw = row[3];
@@ -4225,6 +4287,9 @@ async function onMvpFileChange(event) {
     if (isNaN(totalPoints)) continue; // skip filas sin TOTAL numérico
     const countryIso = lookupCountryIso(countryRaw);
     if (!countryIso) unknownCountry++;
+    // CLUB == 'OK' (case-insensitive) → socio del Club VPT.
+    // Cualquier otro valor (vacío, null, "NO", etc.) → no socio.
+    const inClub = String(clubRaw ?? '').trim().toUpperCase() === 'OK';
     // Torneos: solo los con valor numérico > 0.
     const tournaments = [];
     for (let t = 0; t < _mvpImportTournaments.length; t++) {
@@ -4241,6 +4306,9 @@ async function onMvpFileChange(event) {
       total_points: totalPoints,
       tournaments: tournaments.length > 0 ? { tournaments } : null,
       prize: null, // se rellena si hay hoja PRIZES
+      in_club: inClub,
+      // top10_position / top10_points / top10_tournaments se inyectan
+      // más abajo si la hoja TOP10 existe y matchea el nombre.
     });
   }
 
@@ -4303,16 +4371,46 @@ async function onMvpFileChange(event) {
     }
   }
 
+  // ── Hoja TOP10 (opcional) ─────────────────────────────────
+  // Si existe, el ranking REAL del MVP es el TOP 10 del Club VPT
+  // (10 mejores resultados de cada socio entre los 12 torneos).
+  // Inyectamos top10_position / top10_points / top10_tournaments en
+  // cada jugador de TOTAL que matchee por nombre normalizado. Los
+  // jugadores no socios (no aparecen en TOP10) se quedan con esos
+  // campos undefined → el RPC los inserta como NULL.
+  const top10Map = readTop10Sheet(wb);
+  if (top10Map) {
+    for (const o of out) {
+      const t10 = top10Map.get(o.name.toLowerCase());
+      if (t10) {
+        o.top10_position = t10.top10_position;
+        o.top10_points = t10.top10_points;
+        o.top10_tournaments = t10.top10_tournaments;
+      }
+    }
+  }
+
   // ── Hoja PRIZES (opcional) ──
+  // POSITION en PRIZES corresponde al ranking que rige los premios.
+  // Si tenemos TOP10, la POSITION del PRIZES debe vincularse a
+  // top10_position del jugador (el ranking real). Si no, fallback
+  // al position del TOTAL (compatibilidad con uploads antiguos sin
+  // hoja TOP10).
   let prizesAttached = 0;
   if (wb.SheetNames.includes('PRIZES')) {
     const wsP = wb.Sheets['PRIZES'];
     const dataP = XLSX.utils.sheet_to_json(wsP, { header: 1, defval: '' });
     // Cabeceras esperadas: POSITION, PRIZES, VALUE, WINNERS (al menos 3).
     if (dataP.length >= 2) {
-      // Mapa position → fila out, para vincular en O(N) total.
+      const linkByTop10 = top10Map !== null;
+      // Mapa position-clave → fila out. La clave es top10_position
+      // si linkByTop10 (omite jugadores no socios sin top10), o
+      // position del TOTAL si fallback.
       const byPos = new Map();
-      out.forEach(o => byPos.set(o.position, o));
+      out.forEach(o => {
+        const key = linkByTop10 ? o.top10_position : o.position;
+        if (key != null && !byPos.has(key)) byPos.set(key, o);
+      });
       for (let r = 1; r < dataP.length; r++) {
         const row = dataP[r];
         if (!row || row.every(c => c === '' || c == null)) continue;
@@ -4339,12 +4437,18 @@ async function onMvpFileChange(event) {
     }
   }
 
+  // Conteo de socios del Club VPT detectados.
+  let inClubCount = 0;
+  for (const o of out) if (o.in_club) inClubCount++;
+
   _mvpImportRows = out;
   _mvpImportStats = {
     total: out.length,
     unknownCountry,
     prizesAttached,
     cancelled: cancelledTournamentNames.size,
+    inClub: inClubCount,
+    hasTop10: top10Map !== null,
   };
 
   // ── Render: chips, stats, preview, feedback ──
@@ -4386,10 +4490,27 @@ async function onMvpFileChange(event) {
   stats.appendChild(mk('con país desconocido', _mvpImportStats.unknownCountry));
   stats.appendChild(document.createTextNode('·'));
   stats.appendChild(mk('con premio', _mvpImportStats.prizesAttached));
+  stats.appendChild(document.createTextNode('·'));
+  stats.appendChild(mk('socios del Club VPT', _mvpImportStats.inClub));
   if (_mvpImportStats.cancelled > 0) {
     stats.appendChild(document.createTextNode('·'));
     stats.appendChild(mk('torneos no puntuables', _mvpImportStats.cancelled));
   }
+  // Estado de la hoja TOP10: verde si detectada (premios vinculados
+  // por top10_position), naranja si ausente (fallback a TOTAL).
+  const top10Status = document.createElement('span');
+  top10Status.style.display = 'block';
+  top10Status.style.marginTop = '6px';
+  top10Status.style.fontSize = '11px';
+  top10Status.style.fontWeight = '600';
+  if (_mvpImportStats.hasTop10) {
+    top10Status.style.color = 'var(--green)';
+    top10Status.textContent = '✓ TOP 10 del Club VPT detectado · premios vinculados por TOP10 position';
+  } else {
+    top10Status.style.color = 'var(--orange)';
+    top10Status.textContent = '⚠ Hoja TOP10 no encontrada · premios vinculados por TOTAL position (fallback)';
+  }
+  stats.appendChild(top10Status);
   stats.style.display = '';
 
   // Preview: primeras 10 filas con createElement+textContent
@@ -4399,7 +4520,7 @@ async function onMvpFileChange(event) {
   const table = document.createElement('table');
   const thead = document.createElement('thead');
   const trh = document.createElement('tr');
-  ['#', 'Nombre', 'País', 'Total', 'Torneos', 'Premio'].forEach(h => {
+  ['#', 'Nombre', 'País', 'Club', 'Total', 'TOP10', 'Torneos', 'Premio'].forEach(h => {
     const th = document.createElement('th');
     th.textContent = h;
     trh.appendChild(th);
@@ -4413,7 +4534,9 @@ async function onMvpFileChange(event) {
       String(o.position),
       o.name,
       o.country_iso || '—',
+      o.in_club ? '✓' : '—',
       String(o.total_points),
+      o.top10_position != null ? String(o.top10_position) : '—',
       o.tournaments
         ? `${o.tournaments.tournaments.length} torneos`
         : '—',
