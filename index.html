@@ -2020,6 +2020,16 @@
     background: rgba(201, 168, 76, 0.08);
     font-size: 11px;
   }
+  /* Torneos cancelados / no puntuables (B3 indica "DO NOT SCORE
+     POINTS" / "TOURNAMENT CANCELLED" / etc.). Se cuentan como
+     disputados (entran en tournaments[] con points=0) pero el chip
+     se muestra atenuado para que el admin vea cuáles fueron. */
+  .mvp-import-info .chip.chip-cancelled {
+    opacity: 0.55;
+    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.04);
+  }
   /* Stats: línea horizontal con métricas separadas por · */
   .mvp-import-stats {
     display: flex;
@@ -4120,6 +4130,21 @@ function _readFileAsArrayBuffer(file) {
   });
 }
 
+// Detecta si la celda B3 de la hoja individual de un torneo indica
+// que el torneo no puntúa (cancelado o explícitamente declarado como
+// no-scoring). Case-insensitive, tolera variantes con espacios. Si el
+// match es positivo, el torneo se cuenta como "disputado sin puntos"
+// en el contador 8/12 del tab MVP de la app móvil.
+function isTournamentNonScoring(b3Text) {
+  if (!b3Text || typeof b3Text !== 'string') return false;
+  const t = b3Text.trim().toUpperCase();
+  return t.includes('DO NOT SCORE POINTS')
+      || t.includes('TOURNAMENT CANCELLED')
+      || t.includes('CANCELLED')
+      || t.includes('CANCELADO')
+      || t.includes('NO PUNTUABLE');
+}
+
 async function onMvpFileChange(event) {
   const file = event.target.files && event.target.files[0];
   const submit = document.getElementById('mvp-import-submit');
@@ -4213,6 +4238,50 @@ async function onMvpFileChange(event) {
     return;
   }
 
+  // ── Torneos cancelados / no puntuables ─────────────────────
+  // Hojas individuales del XLSX nombradas "#1 MB WU", "#12 CLOSER",
+  // etc. La celda B3 indica si el torneo NO puntúa ("DO NOT SCORE
+  // POINTS", "TOURNAMENT CANCELLED", "Cancelado", "No puntuable",
+  // ...). Hoy esos torneos se pierden: como nadie tiene puntos en
+  // la columna correspondiente de TOTAL, el filtro `pts > 0` los
+  // excluye de tournaments[] y la app móvil no los cuenta en el
+  // contador "X / Y torneos". Aquí los detectamos y los inyectamos
+  // como entradas con points=0 para que cuenten como disputados.
+  const cancelledTournamentNames = new Set();
+  const tournamentNamesInTotal = new Set(_mvpImportTournaments);
+  // Pattern del nombre de hoja: "#" + número + espacio. Hojas como
+  // "Bonus" o "Cover" no son torneos y se ignoran.
+  const sheetPattern = /^#\d+\s/;
+  for (const sheetName of wb.SheetNames) {
+    if (!sheetPattern.test(sheetName)) continue;
+    const trimmed = sheetName.trim();
+    // Defensivo: solo si la hoja matchea una columna real de TOTAL
+    // (evita inyectar nombres "fantasma" de hojas auxiliares).
+    if (!tournamentNamesInTotal.has(trimmed)) continue;
+    const ws = wb.Sheets[sheetName];
+    const cellB3 = ws && ws['B3'];
+    const b3Text = cellB3 ? String(cellB3.v ?? cellB3.w ?? '') : '';
+    if (isTournamentNonScoring(b3Text)) {
+      cancelledTournamentNames.add(trimmed);
+    }
+  }
+
+  if (cancelledTournamentNames.size > 0) {
+    for (const o of out) {
+      const existing = o.tournaments?.tournaments ?? [];
+      const existingNames = new Set(existing.map(t => t.name));
+      const merged = [...existing];
+      for (const cancelledName of cancelledTournamentNames) {
+        // Edge: cancel parcial donde algún jugador ya sumó puntos.
+        // Mantenemos sus puntos intactos; el resto recibe la
+        // entrada con points=0 para que cuente como disputado.
+        if (existingNames.has(cancelledName)) continue;
+        merged.push({ name: cancelledName, points: 0 });
+      }
+      o.tournaments = merged.length > 0 ? { tournaments: merged } : null;
+    }
+  }
+
   // ── Hoja PRIZES (opcional) ──
   let prizesAttached = 0;
   if (wb.SheetNames.includes('PRIZES')) {
@@ -4254,6 +4323,7 @@ async function onMvpFileChange(event) {
     total: out.length,
     unknownCountry,
     prizesAttached,
+    cancelled: cancelledTournamentNames.size,
   };
 
   // ── Render: chips, stats, preview, feedback ──
@@ -4272,8 +4342,9 @@ async function onMvpFileChange(event) {
   } else {
     _mvpImportTournaments.forEach(t => {
       const c = document.createElement('span');
-      c.className = 'chip';
-      c.textContent = t;
+      const cancelled = cancelledTournamentNames.has(t);
+      c.className = cancelled ? 'chip chip-cancelled' : 'chip';
+      c.textContent = cancelled ? `${t} (no puntuable)` : t;
       info.appendChild(c);
     });
   }
@@ -4294,6 +4365,10 @@ async function onMvpFileChange(event) {
   stats.appendChild(mk('con país desconocido', _mvpImportStats.unknownCountry));
   stats.appendChild(document.createTextNode('·'));
   stats.appendChild(mk('con premio', _mvpImportStats.prizesAttached));
+  if (_mvpImportStats.cancelled > 0) {
+    stats.appendChild(document.createTextNode('·'));
+    stats.appendChild(mk('torneos no puntuables', _mvpImportStats.cancelled));
+  }
   stats.style.display = '';
 
   // Preview: primeras 10 filas con createElement+textContent
