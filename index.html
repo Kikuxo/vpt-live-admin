@@ -2334,12 +2334,6 @@
         <button class="btn-mini" id="edit-festival-btn" type="button"
                 onclick="openFestivalModal(document.getElementById('sel-festival').value)"
                 style="display:none;">✎ Editar</button>
-        <button class="btn-mini" id="import-mvp-btn" type="button"
-                onclick="openMvpRankingModal(document.getElementById('sel-festival').value)"
-                style="display:none;">📊 Ranking MVP</button>
-        <button class="btn-mini" id="sync-flickr-btn" type="button"
-                onclick="syncFlickrAlbumsHandler(document.getElementById('sel-festival').value)"
-                style="display:none;">📷 Sincronizar Flickr</button>
         <label class="show-archived-toggle">
           <input id="show-archived-cb" type="checkbox" onchange="toggleShowArchived()" />
           <span>Mostrar archivados 📦</span>
@@ -2457,6 +2451,68 @@
             <div class="publish-feedback" id="video-form-status" style="display:none;"></div>
           </div>
           <div id="videos-list" class="videos-list"></div>
+        </div>
+      </div>
+
+      <!-- Ranking MVP del festival (colapsable) -->
+      <!-- Reusa las clases .videos-* para coherencia visual con la
+           sección de Vídeos. Los nombres son históricos pero el
+           styling es genérico (header colapsable + body con form). -->
+      <div class="videos-section" id="mvp-section">
+        <div class="videos-header" onclick="toggleMvpSection()">
+          <span class="videos-toggle" id="mvp-toggle">▶</span>
+          <span class="videos-title">🏆 Ranking MVP</span>
+          <span class="videos-count" id="mvp-count">(—)</span>
+        </div>
+        <div class="videos-body" id="mvp-body" style="display:none;">
+          <div class="videos-no-festival" id="mvp-no-festival" style="display:none;">
+            Selecciona un festival primero
+          </div>
+          <div class="videos-form" id="mvp-form">
+            <div id="mvp-summary"
+                 style="font-size:12px;color:var(--muted);line-height:1.5;">
+              No hay ranking subido todavía
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn-mini" type="button"
+                      onclick="openMvpFromSection()">
+                📤 Subir / Editar XLSX
+              </button>
+              <button class="btn-mini" type="button" id="mvp-section-delete-btn"
+                      onclick="deleteMvpFromSection()"
+                      style="display:none;border-color:var(--red);color:var(--red);">
+                🗑 Eliminar
+              </button>
+            </div>
+            <div class="publish-feedback" id="mvp-section-feedback" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fotos (Flickr) del festival (colapsable) -->
+      <div class="videos-section" id="photos-section">
+        <div class="videos-header" onclick="togglePhotosSection()">
+          <span class="videos-toggle" id="photos-toggle">▶</span>
+          <span class="videos-title">📷 Fotos</span>
+          <span class="videos-count" id="photos-count">(—)</span>
+        </div>
+        <div class="videos-body" id="photos-body" style="display:none;">
+          <div class="videos-no-festival" id="photos-no-festival" style="display:none;">
+            Selecciona un festival primero
+          </div>
+          <div class="videos-form" id="photos-form">
+            <div id="photos-summary"
+                 style="font-size:12px;color:var(--muted);line-height:1.5;">
+              No hay álbumes sincronizados todavía
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn-mini" type="button" id="photos-sync-btn"
+                      onclick="syncFlickrFromSection()">
+                📷 Sincronizar desde Flickr
+              </button>
+            </div>
+            <div class="publish-feedback" id="photos-section-feedback" style="display:none;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -3175,14 +3231,14 @@ async function loadFestivals() {
     sel.appendChild(opt);
   });
   syncFestivalEditButton();
-  syncImportMvpButton();
-  syncFlickrSyncButton();
+  loadMvpUploadState();
+  loadFlickrAlbumsState();
 }
 
 function onFestivalChange() {
   syncFestivalEditButton();
-  syncImportMvpButton();
-  syncFlickrSyncButton();
+  loadMvpUploadState();
+  loadFlickrAlbumsState();
   // Reset búsqueda + filtros + knownPostIds al cambiar de festival.
   // Así los posts del nuevo festival animan correctamente al entrar
   // y la lista de torneos del dropdown se reconstruye con los del
@@ -3795,23 +3851,8 @@ function lookupCountryIso(name) {
   return COUNTRY_NAME_TO_ISO[key] || null;
 }
 
-// Mostrar/ocultar el botón "📊 Importar MVP" según value del select.
-function syncImportMvpButton() {
-  const btn = document.getElementById('import-mvp-btn');
-  if (!btn) return;
-  const val = document.getElementById('sel-festival')?.value || '';
-  btn.style.display = val ? '' : 'none';
-}
-
-// Mostrar/ocultar el botón "📷 Sincronizar Flickr" según value del
-// select. Mismo patrón que syncImportMvpButton — visible sólo
-// cuando hay un festival seleccionado.
-function syncFlickrSyncButton() {
-  const btn = document.getElementById('sync-flickr-btn');
-  if (!btn) return;
-  const val = document.getElementById('sel-festival')?.value || '';
-  btn.style.display = val ? '' : 'none';
-}
+// (helpers de toggle de los antiguos botones inline removidos
+// tras mover MVP y Flickr a sus propias secciones colapsables).
 
 // Estado del panel: metadata de la última subida (festival_mvp_uploads)
 // y top-10 del ranking actual para preview. Se rellenan al abrir el
@@ -3919,6 +3960,9 @@ function closeMvpImportModal() {
   _mvpCurrentMeta = null;
   _mvpCurrentRows = null;
   _mvpFestivalTitle = '';
+  // Refrescar la sección MVP del panel principal por si hubo
+  // upload o delete dentro del modal — bajo coste (single-row fetch).
+  if (typeof loadMvpUploadState === 'function') loadMvpUploadState();
 }
 
 // Formato "27 abr 2026 a las 17:34" desde ISO. Meses abreviados ES.
@@ -6332,6 +6376,210 @@ function subscribeFestivalVideosRealtime() {
         { event: '*', schema: 'public', table: 'festival_videos', filter: `festival_id=eq.${fid}` },
         () => loadFestivalVideos())
     .subscribe();
+}
+
+// ── MVP RANKING SECTION (panel colapsable) ───────────────────
+// Replicación del patrón de Videos: sección colapsable con header
+// + body, contador en el header, refresh al expandir y al cambiar
+// festival. Reusa el modal MVP existente para upload y el RPC
+// delete_festival_mvp_ranking para borrado.
+
+let mvpCollapsed = true;
+let mvpUploadMeta = null; // {rows_count, uploaded_at} o null
+
+function toggleMvpSection() {
+  const section = document.getElementById('mvp-section');
+  const body    = document.getElementById('mvp-body');
+  mvpCollapsed = !mvpCollapsed;
+  if (mvpCollapsed) {
+    body.style.display = 'none';
+    section.classList.remove('expanded');
+  } else {
+    body.style.display = 'flex';
+    section.classList.add('expanded');
+    loadMvpUploadState();
+  }
+}
+
+async function loadMvpUploadState() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) {
+    mvpUploadMeta = null;
+    renderMvpSection();
+    return;
+  }
+  const { data, error } = await sb.from('festival_mvp_uploads')
+    .select('rows_count,uploaded_at')
+    .eq('festival_id', fid)
+    .maybeSingle();
+  if (error) { console.warn('loadMvpUploadState', error); }
+  mvpUploadMeta = data || null;
+  renderMvpSection();
+}
+
+function renderMvpSection() {
+  const count   = document.getElementById('mvp-count');
+  const summary = document.getElementById('mvp-summary');
+  const nofest  = document.getElementById('mvp-no-festival');
+  const form    = document.getElementById('mvp-form');
+  const delBtn  = document.getElementById('mvp-section-delete-btn');
+  if (!count || !summary || !form) return;
+
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) {
+    count.textContent = '(—)';
+    nofest.style.display = 'block';
+    form.style.display = 'none';
+    return;
+  }
+  nofest.style.display = 'none';
+  form.style.display = '';
+
+  if (mvpUploadMeta && mvpUploadMeta.rows_count > 0) {
+    const n = mvpUploadMeta.rows_count;
+    count.textContent = `(${n})`;
+    const dt = formatSpanishDateTime(mvpUploadMeta.uploaded_at);
+    summary.innerHTML =
+      `<strong style="color:var(--white);">${n} jugador${n === 1 ? '' : 'es'}</strong> · subido el ${escapeHtml(dt)}`;
+    if (delBtn) delBtn.style.display = '';
+  } else {
+    count.textContent = '(0)';
+    summary.textContent = 'No hay ranking subido todavía';
+    if (delBtn) delBtn.style.display = 'none';
+  }
+}
+
+// Trigger del modal de gestión MVP existente desde la nueva sección.
+// La lógica de upload/replace vive entera en el modal; aquí sólo
+// proxeamos al festival id seleccionado.
+function openMvpFromSection() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return;
+  openMvpRankingModal(fid);
+}
+
+// Borrado directo desde la sección sin abrir el modal. Reusa el RPC
+// delete_festival_mvp_ranking. La función legacy deleteMvpRanking()
+// del modal queda intacta para flujos donde el modal está abierto.
+async function deleteMvpFromSection() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return;
+  if (!mvpUploadMeta || !mvpUploadMeta.rows_count) return;
+  const f = festivals.find(x => x.id === fid);
+  const title = f ? f.title : 'este festival';
+  const n = mvpUploadMeta.rows_count;
+  const ok = confirm(
+    `¿Eliminar el ranking MVP de "${title}" (${n} jugador${n === 1 ? '' : 'es'})? ` +
+    `Esta acción no se puede deshacer.`
+  );
+  if (!ok) return;
+  const fbEl = document.getElementById('mvp-section-feedback');
+  if (fbEl) {
+    fbEl.textContent = 'Eliminando…';
+    fbEl.className = 'publish-feedback';
+    fbEl.style.display = 'block';
+  }
+  const { error } = await sb.rpc('delete_festival_mvp_ranking', {
+    p_festival_id: fid,
+  });
+  if (error) {
+    if (fbEl) {
+      fbEl.textContent = 'Error: ' + error.message;
+      fbEl.className = 'publish-feedback err';
+    }
+    return;
+  }
+  await loadMvpUploadState();
+  if (fbEl) {
+    fbEl.textContent = '✓ Ranking MVP eliminado';
+    fbEl.className = 'publish-feedback ok';
+    setTimeout(() => { fbEl.style.display = 'none'; }, 2500);
+  }
+}
+
+// ── PHOTOS SECTION (panel colapsable) ────────────────────────
+// Estado actual de festival_flickr_albums + botón de sincronizar.
+// Reusa syncFlickrAlbumsHandler() existente para el flujo de fetch
+// + filter + delete + insert; la sección sólo añade la vista de
+// estado y el refresh post-sync.
+
+let photosCollapsed = true;
+let flickrAlbumsCache = []; // [{label, full_title, album_date, ...}]
+
+function togglePhotosSection() {
+  const section = document.getElementById('photos-section');
+  const body    = document.getElementById('photos-body');
+  photosCollapsed = !photosCollapsed;
+  if (photosCollapsed) {
+    body.style.display = 'none';
+    section.classList.remove('expanded');
+  } else {
+    body.style.display = 'flex';
+    section.classList.add('expanded');
+    loadFlickrAlbumsState();
+  }
+}
+
+async function loadFlickrAlbumsState() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) {
+    flickrAlbumsCache = [];
+    renderPhotosSection();
+    return;
+  }
+  const { data, error } = await sb.from('festival_flickr_albums')
+    .select('label,full_title,album_date,created_at')
+    .eq('festival_id', fid)
+    .order('album_date', { ascending: false })
+    .order('position', { ascending: false });
+  if (error) { console.warn('loadFlickrAlbumsState', error); }
+  flickrAlbumsCache = data || [];
+  renderPhotosSection();
+}
+
+function renderPhotosSection() {
+  const count   = document.getElementById('photos-count');
+  const summary = document.getElementById('photos-summary');
+  const nofest  = document.getElementById('photos-no-festival');
+  const form    = document.getElementById('photos-form');
+  if (!count || !summary || !form) return;
+
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) {
+    count.textContent = '(—)';
+    nofest.style.display = 'block';
+    form.style.display = 'none';
+    return;
+  }
+  nofest.style.display = 'none';
+  form.style.display = '';
+
+  const n = flickrAlbumsCache.length;
+  count.textContent = `(${n})`;
+  if (n === 0) {
+    summary.textContent = 'No hay álbumes sincronizados todavía';
+    return;
+  }
+  // Lista compacta con los labels (o full_title si no hay label).
+  // Limita a 8 visibles + "…" para no inflar la sección con festivales
+  // largos. El primer "label" suele ser el más reciente por la sort.
+  const labels = flickrAlbumsCache
+    .map(a => a.label || a.full_title || '—')
+    .map(l => escapeHtml(l));
+  const show = labels.slice(0, 8).join(' · ');
+  const more = labels.length > 8 ? ` <span style="color:var(--muted);">+${labels.length - 8} más</span>` : '';
+  summary.innerHTML =
+    `<strong style="color:var(--white);">${n} álbum${n === 1 ? '' : 'es'}</strong> sincronizado${n === 1 ? '' : 's'}<br>` +
+    `<span style="font-size:11px;letter-spacing:0.5px;">${show}${more}</span>`;
+}
+
+// Wrapper del handler existente. Tras el sync (success o no) recarga
+// el estado de la sección para reflejar el cambio sin reload manual.
+async function syncFlickrFromSection() {
+  const fid = document.getElementById('sel-festival').value;
+  if (!fid) return;
+  await syncFlickrAlbumsHandler(fid);
+  await loadFlickrAlbumsState();
 }
 
 // ── REALTIME: feed (live_updates) ────────────────────────────
