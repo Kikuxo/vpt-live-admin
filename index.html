@@ -2424,36 +2424,6 @@
 
       <div class="divider"></div>
 
-      <!-- Vídeos del festival (colapsable) -->
-      <div class="videos-section" id="videos-section">
-        <div class="videos-header" onclick="toggleVideosSection()">
-          <span class="videos-toggle" id="videos-toggle">▶</span>
-          <span class="videos-title">Vídeos del festival</span>
-          <span class="videos-count" id="videos-count">(0)</span>
-        </div>
-        <div class="videos-body" id="videos-body" style="display:none;">
-          <div class="videos-no-festival" id="videos-no-festival" style="display:none;">
-            Selecciona un festival primero
-          </div>
-          <div class="videos-form" id="videos-form">
-            <input type="text" id="video-url-input"
-                   placeholder="Pega URL de YouTube..."
-                   onblur="previewYouTubeUrl()" autocomplete="off" />
-            <div id="video-preview" class="video-preview" style="display:none;">
-              <img id="video-preview-thumb" src="" alt="" />
-              <div class="video-preview-info">
-                <div id="video-preview-title" class="video-preview-title"></div>
-                <button class="btn-primary" onclick="addFestivalVideo()" style="align-self:flex-start;">
-                  + Añadir al festival
-                </button>
-              </div>
-            </div>
-            <div class="publish-feedback" id="video-form-status" style="display:none;"></div>
-          </div>
-          <div id="videos-list" class="videos-list"></div>
-        </div>
-      </div>
-
       <!-- Ranking MVP del festival (colapsable) -->
       <!-- Reusa las clases .videos-* para coherencia visual con la
            sección de Vídeos. Los nombres son históricos pero el
@@ -2513,6 +2483,36 @@
             </div>
             <div class="publish-feedback" id="photos-section-feedback" style="display:none;"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Vídeos del festival (colapsable) -->
+      <div class="videos-section" id="videos-section">
+        <div class="videos-header" onclick="toggleVideosSection()">
+          <span class="videos-toggle" id="videos-toggle">▶</span>
+          <span class="videos-title">🎬 Vídeos</span>
+          <span class="videos-count" id="videos-count">(0)</span>
+        </div>
+        <div class="videos-body" id="videos-body" style="display:none;">
+          <div class="videos-no-festival" id="videos-no-festival" style="display:none;">
+            Selecciona un festival primero
+          </div>
+          <div class="videos-form" id="videos-form">
+            <input type="text" id="video-url-input"
+                   placeholder="Pega URL de YouTube..."
+                   onblur="previewYouTubeUrl()" autocomplete="off" />
+            <div id="video-preview" class="video-preview" style="display:none;">
+              <img id="video-preview-thumb" src="" alt="" />
+              <div class="video-preview-info">
+                <div id="video-preview-title" class="video-preview-title"></div>
+                <button class="btn-primary" onclick="addFestivalVideo()" style="align-self:flex-start;">
+                  + Añadir al festival
+                </button>
+              </div>
+            </div>
+            <div class="publish-feedback" id="video-form-status" style="display:none;"></div>
+          </div>
+          <div id="videos-list" class="videos-list"></div>
         </div>
       </div>
     </div>
