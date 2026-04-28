@@ -2337,6 +2337,9 @@
         <button class="btn-mini" id="import-mvp-btn" type="button"
                 onclick="openMvpRankingModal(document.getElementById('sel-festival').value)"
                 style="display:none;">📊 Ranking MVP</button>
+        <button class="btn-mini" id="sync-flickr-btn" type="button"
+                onclick="syncFlickrAlbumsHandler(document.getElementById('sel-festival').value)"
+                style="display:none;">📷 Sincronizar Flickr</button>
         <label class="show-archived-toggle">
           <input id="show-archived-cb" type="checkbox" onchange="toggleShowArchived()" />
           <span>Mostrar archivados 📦</span>
@@ -3142,7 +3145,7 @@ async function loadFestivals() {
   // de archivados está apagado, filtramos a nivel de query (cubre
   // el índice parcial festivals_active_idx).
   let q = sb.from('festivals')
-    .select('id,title,flag_emoji,is_live,country,starts_at,ends_at,archived_at')
+    .select('id,title,flag_emoji,is_live,country,starts_at,ends_at,archived_at,flickr_user_id,season')
     .order('starts_at', { ascending: false })
     .limit(50);
   if (!showArchivedFestivals) q = q.is('archived_at', null);
@@ -3173,11 +3176,13 @@ async function loadFestivals() {
   });
   syncFestivalEditButton();
   syncImportMvpButton();
+  syncFlickrSyncButton();
 }
 
 function onFestivalChange() {
   syncFestivalEditButton();
   syncImportMvpButton();
+  syncFlickrSyncButton();
   // Reset búsqueda + filtros + knownPostIds al cambiar de festival.
   // Así los posts del nuevo festival animan correctamente al entrar
   // y la lista de torneos del dropdown se reconstruye con los del
@@ -3503,6 +3508,195 @@ async function unarchiveFestival() {
   syncFestivalEditButton();
 }
 
+// ── FLICKR ALBUMS SYNC (admin → festival_flickr_albums) ──────
+// Botón "📷 Sincronizar Flickr": lista TODOS los álbumes del
+// flickr_user_id del festival (flickr.photosets.getList), filtra
+// los que pertenecen a este festival por ciudad+año, parsea
+// title → label "FRI 20 MAR" + album_date YYYY-MM-DD y reemplaza
+// la tabla festival_flickr_albums (DELETE + INSERT).
+
+// "VPT Bucharest 2026" / "VPT Bucharest '26" / "VPT Lisboa — Grand Final 2026"
+// → "Bucharest" / "Lisboa". Strip prefix VPT, sufijos Grand Final,
+// y años (formato largo 2026 o corto '26).
+function _flickrExtractCity(festivalTitle) {
+  if (!festivalTitle) return '';
+  return festivalTitle
+    .replace(/^VPT\s+/i, '')
+    .replace(/\s*[—\-]\s*Grand Final.*$/i, '')
+    .replace(/\s+\d{4}.*$/, '')
+    .replace(/\s+'\d{2}.*$/, '')
+    .trim();
+}
+
+// Match álbum-festival: el título del álbum debe contener la
+// ciudad Y (el año largo "2026" O el corto "'26"). Lowercase
+// strict: la heurística asume que Flickr usa nombres consistentes.
+function _flickrAlbumBelongsTo(festival, albumTitle) {
+  const city = _flickrExtractCity(festival.title || '');
+  if (!city) return false;
+  const yearLong = String(festival.season || '');
+  const yearShort = yearLong.length === 4 ? "'" + yearLong.slice(-2) : '';
+  const t = (albumTitle || '').toLowerCase();
+  if (!t.includes(city.toLowerCase())) return false;
+  if (!yearLong) return true; // si no hay season, sólo filtramos por ciudad
+  return t.includes(yearLong) || (yearShort && t.includes(yearShort));
+}
+
+// "VPT Bucharest '26 - Fri 20 March" → "FRI 20 MAR".
+// Si no hay " - " separador, devuelve el título completo en uppercase.
+function _flickrParseLabel(fullTitle) {
+  if (!fullTitle) return 'ÁLBUM';
+  const parts = fullTitle.split(' - ');
+  if (parts.length < 2) return fullTitle.toUpperCase();
+  const tail = parts[parts.length - 1].trim();
+  const words = tail.split(/\s+/);
+  if (words.length >= 3) {
+    const day = words[0].toUpperCase().slice(0, 3);
+    const num = words[1];
+    const month = words[2].toUpperCase().slice(0, 3);
+    return `${day} ${num} ${month}`;
+  }
+  return tail.toUpperCase();
+}
+
+// "VPT Bucharest '26 - Fri 20 March" + 2026 → "2026-03-20".
+// Devuelve null si no parsea (formato distinto, sin día/mes).
+function _flickrParseDate(fullTitle, festivalYear) {
+  if (!fullTitle) return null;
+  const parts = fullTitle.split(' - ');
+  if (parts.length < 2) return null;
+  const tail = parts[parts.length - 1];
+  const words = tail.split(/\s+/);
+  if (words.length < 3) return null;
+  const day = parseInt(words[1], 10);
+  if (isNaN(day)) return null;
+  const months = {
+    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
+  };
+  const month = months[words[2].toLowerCase()];
+  if (month === undefined) return null;
+  const year = parseInt(festivalYear, 10);
+  if (isNaN(year)) return null;
+  // Date.UTC evita desplazamientos por zona horaria al toISOString().
+  const date = new Date(Date.UTC(year, month, day));
+  return date.toISOString().slice(0, 10);
+}
+
+// Ejecuta el flujo completo: fetch list + filter + parse + delete + insert.
+// Devuelve un resumen { totalFlickrAlbums, matched, inserted, failedParse }.
+async function _flickrSyncAlbums(festival) {
+  const params = new URLSearchParams({
+    method: 'flickr.photosets.getList',
+    api_key: FLICKR_API_KEY,
+    user_id: festival.flickr_user_id,
+    format: 'json',
+    nojsoncallback: '1',
+    per_page: '500',
+    primary_photo_extras: 'url_n,url_m',
+  });
+  const url = `https://api.flickr.com/services/rest/?${params.toString()}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (data.stat !== 'ok') {
+    throw new Error(`Flickr API error: ${data.message || data.stat}`);
+  }
+  const allAlbums = data.photosets?.photoset || [];
+  const matched = allAlbums.filter((a) =>
+    _flickrAlbumBelongsTo(festival, a.title?._content || '')
+  );
+  // position decrece con el index para que el orden de Flickr (más
+  // reciente primero según user_id ordering) se preserve cuando hay
+  // varios álbumes con la misma fecha o sin fecha parseable.
+  const rowsToInsert = matched.map((album, idx) => {
+    const fullTitle = album.title?._content || '';
+    const albumDate = _flickrParseDate(fullTitle, festival.season);
+    const coverUrl =
+      album.primary_photo_extras?.url_n ||
+      album.primary_photo_extras?.url_m ||
+      null;
+    return {
+      festival_id: festival.id,
+      flickr_album_id: album.id,
+      full_title: fullTitle,
+      label: _flickrParseLabel(fullTitle),
+      album_date: albumDate,
+      cover_url: coverUrl,
+      position: matched.length - idx,
+    };
+  });
+
+  const { error: delError } = await sb
+    .from('festival_flickr_albums')
+    .delete()
+    .eq('festival_id', festival.id);
+  if (delError) throw new Error(`Delete error: ${delError.message}`);
+
+  if (rowsToInsert.length > 0) {
+    const { error: insError } = await sb
+      .from('festival_flickr_albums')
+      .insert(rowsToInsert);
+    if (insError) throw new Error(`Insert error: ${insError.message}`);
+  }
+
+  return {
+    totalFlickrAlbums: allAlbums.length,
+    matched: matched.length,
+    inserted: rowsToInsert.length,
+    failedParse: rowsToInsert.filter((r) => r.album_date === null).length,
+  };
+}
+
+// Handler del botón. Validaciones previas + confirm() + ejecutar +
+// alert con resumen. Deshabilita el botón durante la sync para
+// evitar dobles disparos accidentales.
+async function syncFlickrAlbumsHandler(festivalId) {
+  if (!festivalId) return;
+  const festival = festivals.find((f) => f.id === festivalId);
+  if (!festival) {
+    alert('Festival no encontrado en cache. Recarga la lista.');
+    return;
+  }
+  if (!festival.flickr_user_id) {
+    alert('Este festival no tiene flickr_user_id configurado.');
+    return;
+  }
+  if (!festival.season) {
+    alert('Este festival no tiene season configurada.');
+    return;
+  }
+  const ok = window.confirm(
+    `¿Sincronizar álbumes de Flickr para "${festival.title}"?\n\n` +
+      `Esto borrará los álbumes registrados actualmente y los ` +
+      `re-importará desde Flickr (filtrados por ciudad + año).`
+  );
+  if (!ok) return;
+
+  const btn = document.getElementById('sync-flickr-btn');
+  const prevText = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Sincronizando...';
+  }
+  try {
+    const r = await _flickrSyncAlbums(festival);
+    let msg =
+      `✓ ${r.inserted} álbumes sincronizados ` +
+      `(${r.matched} matched de ${r.totalFlickrAlbums} totales en Flickr)`;
+    if (r.failedParse > 0) {
+      msg += `\n\n⚠ ${r.failedParse} álbumes sin fecha parseable (album_date NULL).`;
+    }
+    alert(msg);
+  } catch (e) {
+    alert(`✗ Error: ${e.message || e}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+  }
+}
+
 // ── MVP IMPORT (admin → festival_mvp_ranking vía XLSX + RPC) ──
 // SheetJS lee el XLSX cliente-side. Dos hojas obligatorias:
 //   · TOTAL  → 1 fila por jugador con CLUB/POS/NAME/COUNTRY/TOTAL
@@ -3604,6 +3798,16 @@ function lookupCountryIso(name) {
 // Mostrar/ocultar el botón "📊 Importar MVP" según value del select.
 function syncImportMvpButton() {
   const btn = document.getElementById('import-mvp-btn');
+  if (!btn) return;
+  const val = document.getElementById('sel-festival')?.value || '';
+  btn.style.display = val ? '' : 'none';
+}
+
+// Mostrar/ocultar el botón "📷 Sincronizar Flickr" según value del
+// select. Mismo patrón que syncImportMvpButton — visible sólo
+// cuando hay un festival seleccionado.
+function syncFlickrSyncButton() {
+  const btn = document.getElementById('sync-flickr-btn');
   if (!btn) return;
   const val = document.getElementById('sel-festival')?.value || '';
   btn.style.display = val ? '' : 'none';
