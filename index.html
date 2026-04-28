@@ -4145,6 +4145,17 @@ function isTournamentNonScoring(b3Text) {
       || t.includes('NO PUNTUABLE');
 }
 
+// Extrae el número de torneo del prefijo "#N" del nombre de hoja o
+// header. Las hojas individuales se llaman "#9" o "#9 LADIES"; los
+// headers de TOTAL siempre traen el sufijo ("#9 LADIES"). Matcheamos
+// por número, no por nombre completo, porque las hojas pueden venir
+// sin sufijo (caso real visto en el XLSX de Rozvadov).
+function extractTournamentNumber(name) {
+  if (!name) return null;
+  const m = String(name).trim().match(/^#(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 async function onMvpFileChange(event) {
   const file = event.target.files && event.target.files[0];
   const submit = document.getElementById('mvp-import-submit');
@@ -4239,30 +4250,40 @@ async function onMvpFileChange(event) {
   }
 
   // ── Torneos cancelados / no puntuables ─────────────────────
-  // Hojas individuales del XLSX nombradas "#1 MB WU", "#12 CLOSER",
-  // etc. La celda B3 indica si el torneo NO puntúa ("DO NOT SCORE
-  // POINTS", "TOURNAMENT CANCELLED", "Cancelado", "No puntuable",
-  // ...). Hoy esos torneos se pierden: como nadie tiene puntos en
-  // la columna correspondiente de TOTAL, el filtro `pts > 0` los
+  // Hojas individuales del XLSX nombradas "#1", "#9", "#12 CLOSER",
+  // etc. (puede venir sólo con número o con sufijo del nombre del
+  // torneo — variable según cómo guarde Excel cada hoja). La celda
+  // B3 indica si el torneo NO puntúa ("DO NOT SCORE POINTS",
+  // "TOURNAMENT CANCELLED", "Cancelado", "No puntuable", ...).
+  // Hoy esos torneos se pierden: como nadie tiene puntos en la
+  // columna correspondiente de TOTAL, el filtro `pts > 0` los
   // excluye de tournaments[] y la app móvil no los cuenta en el
-  // contador "X / Y torneos". Aquí los detectamos y los inyectamos
-  // como entradas con points=0 para que cuenten como disputados.
+  // contador "X / Y torneos". Aquí los detectamos por NÚMERO de
+  // torneo (no por nombre completo: "#9" en la hoja vs "#9 LADIES"
+  // en TOTAL), y los inyectamos como entradas con points=0 para
+  // que cuenten como disputados.
   const cancelledTournamentNames = new Set();
-  const tournamentNamesInTotal = new Set(_mvpImportTournaments);
-  // Pattern del nombre de hoja: "#" + número + espacio. Hojas como
-  // "Bonus" o "Cover" no son torneos y se ignoran.
-  const sheetPattern = /^#\d+\s/;
+  // Mapa número → header completo de TOTAL (e.g., 9 → "#9 LADIES").
+  // El header de TOTAL es la fuente canónica del nombre del torneo
+  // — es lo que se guarda en tournaments[].name por jugador y lo
+  // que la app móvil ve.
+  const totalHeaderByNumber = new Map();
+  for (const header of _mvpImportTournaments) {
+    const num = extractTournamentNumber(header);
+    if (num !== null) totalHeaderByNumber.set(num, header);
+  }
   for (const sheetName of wb.SheetNames) {
-    if (!sheetPattern.test(sheetName)) continue;
-    const trimmed = sheetName.trim();
-    // Defensivo: solo si la hoja matchea una columna real de TOTAL
-    // (evita inyectar nombres "fantasma" de hojas auxiliares).
-    if (!tournamentNamesInTotal.has(trimmed)) continue;
+    const num = extractTournamentNumber(sheetName);
+    if (num === null) continue; // hojas TOTAL, PRIZES, TOP 10, etc.
+    const totalHeader = totalHeaderByNumber.get(num);
+    // Defensivo: hoja con #N que no tiene columna en TOTAL → ignorar
+    // (e.g., torneo eliminado del setup pero la hoja sigue ahí).
+    if (!totalHeader) continue;
     const ws = wb.Sheets[sheetName];
     const cellB3 = ws && ws['B3'];
     const b3Text = cellB3 ? String(cellB3.v ?? cellB3.w ?? '') : '';
     if (isTournamentNonScoring(b3Text)) {
-      cancelledTournamentNames.add(trimmed);
+      cancelledTournamentNames.add(totalHeader);
     }
   }
 
