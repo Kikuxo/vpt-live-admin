@@ -2079,6 +2079,112 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
+  /* ── Annual Ranking tab (vista global) ──────────────────── */
+  .annual-shell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    max-width: 980px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .annual-header {
+    position: relative;
+    padding: 18px 20px;
+    background: rgba(201, 168, 76, 0.06);
+    border: 1px solid rgba(201, 168, 76, 0.20);
+    border-radius: 12px;
+  }
+  .annual-header-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.4px;
+    margin-bottom: 6px;
+  }
+  .annual-header-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+    max-width: 760px;
+  }
+  .annual-season-pill {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid rgba(201, 168, 76, 0.35);
+    background: rgba(201, 168, 76, 0.08);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+    font-family: 'DM Mono', monospace;
+  }
+  .annual-season-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+  }
+  .annual-meta {
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--surface2);
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  .annual-meta strong { color: var(--text); }
+  .annual-drop-zone {
+    padding: 36px 24px;
+    border: 2px dashed rgba(201, 168, 76, 0.35);
+    border-radius: 14px;
+    background: rgba(201, 168, 76, 0.03);
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .annual-drop-zone:hover {
+    background: rgba(201, 168, 76, 0.06);
+    border-color: rgba(201, 168, 76, 0.60);
+  }
+  .annual-drop-zone.dragover {
+    background: rgba(201, 168, 76, 0.10);
+    border-color: var(--gold);
+  }
+  .annual-drop-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+    opacity: 0.85;
+  }
+  .annual-drop-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .annual-drop-hint {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  .annual-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 8px;
+  }
+
   /* Toggle "Mostrar archivados" en .festival-actions: empujado a la
      derecha con margin-left:auto, estilo discreto. */
   .show-archived-toggle {
@@ -2312,6 +2418,7 @@
       <button class="nav-tab active" data-view="feed"    onclick="switchView('feed')">Feed</button>
       <button class="nav-tab"        data-view="players" onclick="switchView('players')">Jugadores</button>
       <button class="nav-tab"        data-view="chat"    onclick="switchView('chat')">Chat<span class="nav-badge" id="nav-chat-badge" style="display:none;">0</span></button>
+      <button class="nav-tab"        data-view="annual"  onclick="switchView('annual')">Annual Ranking</button>
     </nav>
     <div class="header-user">
       <div class="user-avatar" id="user-initials">—</div>
@@ -2695,6 +2802,65 @@
     </div>
   </div><!-- /#view-chat -->
 
+  <!-- ═══════════════════ VIEW: ANNUAL RANKING ════════════════════ -->
+  <!-- Tab para subir el XLSX del Annual Ranking VPT 2026 (Vamos a
+       Las Vegas). Parser SheetJS lee hojas TOTAL + PRIZES, construye
+       festival_breakdown por jugador, y manda al RPC
+       replace_annual_ranking que archiva el snapshot previo y
+       guarda el nuevo. Ver schema en
+       supabase/migrations/20260429_annual_ranking_schema.sql. -->
+  <div id="view-annual" class="view">
+    <div class="annual-shell">
+      <div class="annual-header">
+        <div class="annual-header-title">Annual Ranking · VPT 2026</div>
+        <div class="annual-header-desc">
+          Sube el XLSX del ranking anual con todos los jugadores,
+          premios y desglose por festival. Lee automáticamente las
+          hojas <strong>TOTAL</strong> y <strong>PRIZES</strong>.
+        </div>
+        <div class="annual-season-pill">
+          <span class="annual-season-dot"></span>VPT 2026
+        </div>
+      </div>
+
+      <div id="annual-meta" class="annual-meta">
+        <span style="color:var(--muted);">Cargando metadata…</span>
+      </div>
+
+      <div id="annual-drop-zone" class="annual-drop-zone">
+        <input id="annual-xlsx-file" type="file" accept=".xlsx,.xls"
+               style="display:none;"
+               onchange="onAnnualFileChange(event)" />
+        <div class="annual-drop-icon">📤</div>
+        <div class="annual-drop-text">
+          Arrastra el XLSX aquí o haz clic para seleccionar
+        </div>
+        <div class="annual-drop-hint">
+          Solo .xlsx · Reemplaza el ranking actual de la temporada
+        </div>
+      </div>
+
+      <div id="annual-import-stats" class="mvp-import-stats"
+           style="display:none;"></div>
+
+      <div id="annual-import-preview" class="mvp-import-preview"
+           style="display:none;"></div>
+
+      <div id="annual-import-feedback" class="publish-feedback"
+           style="display:none;"></div>
+
+      <div class="annual-actions" id="annual-actions" style="display:none;">
+        <button type="button" class="btn-secondary"
+                onclick="resetAnnualUpload()">Cancelar</button>
+        <button id="annual-submit-btn" class="btn-publish"
+                style="padding:12px 18px;" disabled
+                onclick="confirmAnnualUpload()">
+          Subir Annual Ranking
+        </button>
+      </div>
+    </div>
+  </div><!-- /#view-annual -->
+
 </div>
 
 <!-- Dropdown de autocompletado @jugador -->
@@ -2852,6 +3018,35 @@
                 style="padding:12px 18px;" disabled
                 onclick="uploadMvpRanking()">Subir y reemplazar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: confirmación de upload del Annual Ranking -->
+<div id="annual-confirm-modal" class="modal-backdrop" style="display:none;"
+     onclick="if(event.target===event.currentTarget)closeAnnualConfirm();">
+  <div class="modal" onclick="event.stopPropagation();" style="width:520px; max-width:96vw;">
+    <div class="modal-header">
+      <div class="modal-title">Confirmar upload</div>
+      <button class="btn-logout" onclick="closeAnnualConfirm()" title="Cerrar">✕</button>
+    </div>
+    <div style="padding:18px 22px; line-height:1.5;">
+      <p style="margin:0 0 10px;">
+        Esto reemplazará el ranking anterior de <strong>VPT 2026</strong>:
+      </p>
+      <p id="annual-confirm-detail" style="margin:0 0 12px; color:var(--gold);"></p>
+      <p style="margin:0; color:var(--muted); font-size:12px;">
+        Las entradas previas se archivan (no se borran) — se podrá auditar
+        el histórico desde Supabase si hace falta.
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary"
+              onclick="closeAnnualConfirm()">Cancelar</button>
+      <div style="flex:1;"></div>
+      <button id="annual-confirm-btn" type="button" class="btn-publish"
+              style="padding:10px 16px;"
+              onclick="uploadAnnualRanking()">Confirmar y subir</button>
     </div>
   </div>
 </div>
@@ -4591,6 +4786,428 @@ async function uploadMvpRanking() {
   }, 900);
 }
 
+// ══════════════════════════════════════════════════════════════
+// ANNUAL RANKING — upload XLSX (vista global del admin)
+// ══════════════════════════════════════════════════════════════
+//
+// Flujo: drag/drop o click en zona → SheetJS parsea TOTAL+PRIZES →
+// preview con stats + tabla → confirmar → RPC replace_annual_ranking
+// (en supabase/migrations/20260429_annual_ranking_schema.sql).
+//
+// Hardcoded a season 2026 — cuando llegue 2027 evolucionamos.
+
+const ANNUAL_SEASON = 2026;
+const ANNUAL_FESTIVAL_COLS = [
+  { name: '#1 Rozvadov',     col: 4 },
+  { name: '#2 Bucharest',    col: 5 },
+  { name: '#3 Slovakia',     col: 6 },
+  { name: '#4 Troia',        col: 7 },
+  { name: '#5 Milano',       col: 8 },
+  { name: '#6 Murcia',       col: 9 },
+  { name: '#7 Sofia',        col: 10 },
+  { name: '#8 Lisboa Final', col: 11 },
+];
+const ANNUAL_HEADERS_EXPECTED = [
+  'POS', 'NAME', 'COUNTRY', 'BEST 5 + FINAL',
+  '#1 ROZVADOV', '#2 BUCHAREST', '#3 SLOVAKIA', '#4 TROIA',
+  '#5 MILANO', '#6 MURCIA', '#7 SOFIA', '#8 LISBOA',
+  'EXTRA POINS', 'TOTAL POINTS', 'FESTIVALS',
+];
+
+let _annualParsed = null;
+let _annualFilename = null;
+
+// Parse del XLSX. Devuelve {entries, stats} o lanza Error con
+// mensaje legible si el archivo no es válido.
+async function readAnnualXlsx(file) {
+  const data = await _readFileAsArrayBuffer(file);
+  const wb = XLSX.read(data, { type: 'array' });
+
+  if (!wb.SheetNames.includes('TOTAL')) {
+    throw new Error('Falta hoja TOTAL en el XLSX');
+  }
+  if (!wb.SheetNames.includes('PRIZES')) {
+    throw new Error('Falta hoja PRIZES en el XLSX');
+  }
+
+  // ── Hoja TOTAL ──
+  const totalRows = XLSX.utils.sheet_to_json(wb.Sheets['TOTAL'], {
+    header: 1, defval: null, blankrows: false,
+  });
+  if (totalRows.length < 2) {
+    throw new Error('La hoja TOTAL no tiene filas de datos');
+  }
+
+  // Validación soft de cabeceras: warning en consola si no coinciden,
+  // pero no fallamos hard porque algunos XLSX traen variaciones.
+  const headers = totalRows[0] || [];
+  for (let i = 0; i < ANNUAL_HEADERS_EXPECTED.length; i++) {
+    const got = String(headers[i] ?? '').trim().toUpperCase();
+    const want = ANNUAL_HEADERS_EXPECTED[i].toUpperCase();
+    if (got !== want) {
+      console.warn(
+        `[Annual] Header mismatch col ${i}: expected "${want}", got "${got}"`
+      );
+    }
+  }
+
+  const entries = [];
+  let withBreakdown = 0;
+
+  for (let i = 1; i < totalRows.length; i++) {
+    const r = totalRows[i];
+    if (!r) continue;
+
+    const totalPoints = Number(r[13]) || 0;
+    if (totalPoints <= 0) continue; // skip filas vacías al final
+
+    const position = Number(r[0]);
+    const name = String(r[1] ?? '').trim();
+    const country = String(r[2] ?? '').trim();
+    const bestPoints = Number(r[3]) || 0;
+    const extraPoints = Number(r[12]) || 0;
+    const festivalsCount = Number(r[14]) || 0;
+
+    if (!position || !name) continue;
+
+    // Recolectar festivales con puntos > 0
+    const tempFests = [];
+    for (const fc of ANNUAL_FESTIVAL_COLS) {
+      const pts = Number(r[fc.col]) || 0;
+      if (pts > 0) {
+        tempFests.push({
+          name: fc.name,
+          points: pts,
+          isFinal: fc.name.toLowerCase().includes('final'),
+        });
+      }
+    }
+
+    // Marcar counted: top 5 (excluyendo Final) por puntos desc +
+    // Final siempre cuenta. Si jugó <5 festivales no-Final, todos
+    // van como counted=true.
+    const sortedNonFinal = tempFests
+      .filter((f) => !f.isFinal)
+      .sort((a, b) => b.points - a.points);
+    const top5Names = new Set(
+      sortedNonFinal.slice(0, 5).map((f) => f.name)
+    );
+
+    const breakdown = tempFests.map((f) => ({
+      name: f.name,
+      points: f.points,
+      counted: f.isFinal || top5Names.has(f.name),
+    }));
+    if (breakdown.length > 0) withBreakdown++;
+
+    // Bonuses (P-U = cols 15-20). Solo guardamos si alguno > 0.
+    const bonuses = {
+      me_3: Number(r[15]) || 0,
+      hr_3: Number(r[16]) || 0,
+      me_5: Number(r[17]) || 0,
+      hr_5: Number(r[18]) || 0,
+      me_6: Number(r[19]) || 0,
+      hr_6: Number(r[20]) || 0,
+    };
+    const hasBonuses = Object.values(bonuses).some((v) => v > 0);
+
+    entries.push({
+      position,
+      name,
+      country,
+      best_points: bestPoints,
+      total_points: totalPoints,
+      extra_points: extraPoints,
+      festivals_count: festivalsCount,
+      festival_breakdown: breakdown,
+      bonuses: hasBonuses ? bonuses : null,
+    });
+  }
+
+  if (entries.length === 0) {
+    throw new Error('La hoja TOTAL no tiene jugadores con puntos > 0');
+  }
+
+  // ── Hoja PRIZES ──
+  const prizesRows = XLSX.utils.sheet_to_json(wb.Sheets['PRIZES'], {
+    header: 1, defval: null, blankrows: false,
+  });
+  const prizeByPos = {};
+  for (let i = 1; i < prizesRows.length; i++) {
+    const r = prizesRows[i];
+    if (!r) continue;
+    const pos = Number(r[0]);
+    if (!pos || pos < 1 || pos > 100) continue; // skip filas resumen
+    const desc = String(r[1] ?? '').trim();
+    const valueRaw = r[2];
+    const value = valueRaw == null || valueRaw === '' ? null : Number(valueRaw);
+    const winner = String(r[3] ?? '').trim() || null;
+    if (!desc) continue;
+    prizeByPos[pos] = {
+      description: desc,
+      value: Number.isFinite(value) ? value : null,
+      winner,
+    };
+  }
+
+  // Asignar premios a las entries
+  for (const e of entries) {
+    const p = prizeByPos[e.position];
+    if (p) {
+      e.prize_description = p.description;
+      e.prize_value = p.value;
+      e.prize_winner = p.winner;
+    }
+  }
+
+  entries.sort((a, b) => a.position - b.position);
+
+  return {
+    entries,
+    stats: {
+      total: entries.length,
+      prized: Object.keys(prizeByPos).length,
+      withBreakdown,
+    },
+  };
+}
+
+function showAnnualFeedback(msg, type) {
+  const el = document.getElementById('annual-import-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'publish-feedback ' + (type || '');
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function loadAnnualUploadMeta() {
+  const el = document.getElementById('annual-meta');
+  if (!el) return;
+  const { data, error } = await sb
+    .from('annual_ranking_uploads')
+    .select('uploaded_at, rows_count, prizes_count, source_filename')
+    .eq('season', ANNUAL_SEASON)
+    .order('uploaded_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) {
+    el.innerHTML = `<span style="color:var(--muted);">Aún no hay upload para VPT ${ANNUAL_SEASON}.</span>`;
+    return;
+  }
+  const dt = new Date(data.uploaded_at);
+  const dateStr = dt.toLocaleDateString('es-ES', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+  const timeStr = dt.toLocaleTimeString('es-ES', {
+    hour: '2-digit', minute: '2-digit',
+  });
+  const fname = data.source_filename
+    ? ` · <span style="color:var(--muted);">${escapeHtml(data.source_filename)}</span>`
+    : '';
+  el.innerHTML = `
+    <strong>Último upload:</strong> ${dateStr} · ${timeStr} ·
+    <strong>${data.rows_count}</strong> jugadores ·
+    <strong>${data.prizes_count}</strong> premios${fname}
+  `;
+}
+
+function _isoToFlagEmoji(iso) {
+  if (!iso || iso.length !== 2) return '';
+  const A = 0x1F1E6;
+  const codeA = iso.toUpperCase().charCodeAt(0) - 65;
+  const codeB = iso.toUpperCase().charCodeAt(1) - 65;
+  if (codeA < 0 || codeA > 25 || codeB < 0 || codeB > 25) return '';
+  return String.fromCodePoint(A + codeA) + String.fromCodePoint(A + codeB);
+}
+
+function renderAnnualPreview(parsed) {
+  const stats = document.getElementById('annual-import-stats');
+  const preview = document.getElementById('annual-import-preview');
+  const actions = document.getElementById('annual-actions');
+  const submit = document.getElementById('annual-submit-btn');
+
+  // Stats line
+  stats.innerHTML = '';
+  const mk = (label, value) => {
+    const span = document.createElement('span');
+    const b = document.createElement('strong');
+    b.textContent = String(value);
+    span.appendChild(b);
+    span.appendChild(document.createTextNode(' ' + label));
+    return span;
+  };
+  stats.appendChild(mk('jugadores válidos', parsed.stats.total));
+  stats.appendChild(document.createTextNode('·'));
+  stats.appendChild(mk('premiados', parsed.stats.prized));
+  stats.appendChild(document.createTextNode('·'));
+  stats.appendChild(mk('con desglose por festival', parsed.stats.withBreakdown));
+  stats.style.display = 'flex';
+
+  // Preview tabla (primeras 25 filas)
+  preview.innerHTML = '';
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const trh = document.createElement('tr');
+  ['#', '', 'Nombre', 'TOTAL', 'BEST5', 'Fest', 'Premio'].forEach((h) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    trh.appendChild(th);
+  });
+  thead.appendChild(trh);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  parsed.entries.slice(0, 25).forEach((o) => {
+    const tr = document.createElement('tr');
+    const iso = lookupCountryIso(o.country);
+    const flag = _isoToFlagEmoji(iso) || '—';
+    const prizeCell = o.prize_description
+      ? (o.prize_value ? `€${o.prize_value} · ${o.prize_description}` : o.prize_description)
+      : '—';
+    [
+      String(o.position),
+      flag,
+      o.name,
+      o.total_points.toFixed(2),
+      o.best_points.toFixed(2),
+      String(o.festivals_count),
+      prizeCell,
+    ].forEach((v) => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  preview.appendChild(table);
+  preview.style.display = '';
+
+  actions.style.display = 'flex';
+  submit.disabled = false;
+
+  showAnnualFeedback(
+    `${parsed.stats.total} jugadores listos para subir.`,
+    'ok'
+  );
+}
+
+async function onAnnualFileChange(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  await processAnnualFile(file);
+}
+
+async function processAnnualFile(file) {
+  const submit = document.getElementById('annual-submit-btn');
+  submit.disabled = true;
+  if (typeof XLSX === 'undefined') {
+    showAnnualFeedback('SheetJS no está cargado. Recarga la página.', 'err');
+    return;
+  }
+  try {
+    const parsed = await readAnnualXlsx(file);
+    _annualParsed = parsed;
+    _annualFilename = file.name;
+    renderAnnualPreview(parsed);
+  } catch (e) {
+    _annualParsed = null;
+    _annualFilename = null;
+    showAnnualFeedback('Error al leer el archivo: ' + (e?.message || e), 'err');
+    document.getElementById('annual-import-stats').style.display = 'none';
+    document.getElementById('annual-import-preview').style.display = 'none';
+    document.getElementById('annual-actions').style.display = 'none';
+  }
+}
+
+function resetAnnualUpload() {
+  _annualParsed = null;
+  _annualFilename = null;
+  const input = document.getElementById('annual-xlsx-file');
+  if (input) input.value = '';
+  document.getElementById('annual-import-stats').style.display = 'none';
+  document.getElementById('annual-import-preview').style.display = 'none';
+  document.getElementById('annual-actions').style.display = 'none';
+  showAnnualFeedback('', '');
+}
+
+function setupAnnualDragDrop() {
+  const zone = document.getElementById('annual-drop-zone');
+  const input = document.getElementById('annual-xlsx-file');
+  if (!zone || !input) return;
+
+  zone.addEventListener('click', () => input.click());
+
+  ['dragover', 'dragenter'].forEach((ev) => {
+    zone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'dragend', 'drop'].forEach((ev) => {
+    zone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.remove('dragover');
+    });
+  });
+  zone.addEventListener('drop', async (e) => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.name.match(/\.xlsx?$/i)) {
+      showAnnualFeedback('Solo se aceptan archivos .xlsx / .xls', 'err');
+      return;
+    }
+    await processAnnualFile(file);
+  });
+}
+
+function confirmAnnualUpload() {
+  if (!_annualParsed) return;
+  const detail = document.getElementById('annual-confirm-detail');
+  detail.textContent =
+    `Snapshot anterior → archivado. ` +
+    `${_annualParsed.stats.total} jugadores nuevos · ` +
+    `${_annualParsed.stats.prized} premios.`;
+  document.getElementById('annual-confirm-modal').style.display = 'flex';
+}
+
+function closeAnnualConfirm() {
+  document.getElementById('annual-confirm-modal').style.display = 'none';
+}
+
+async function uploadAnnualRanking() {
+  if (!_annualParsed) return;
+  const submit = document.getElementById('annual-confirm-btn');
+  if (submit) submit.disabled = true;
+  showAnnualFeedback('Subiendo…', '');
+
+  const payload = { entries: _annualParsed.entries };
+  const { data, error } = await sb.rpc('replace_annual_ranking', {
+    p_season: ANNUAL_SEASON,
+    p_payload: payload,
+    p_filename: _annualFilename,
+  });
+
+  if (error) {
+    showAnnualFeedback('Error al subir: ' + error.message, 'err');
+    if (submit) submit.disabled = false;
+    return;
+  }
+
+  closeAnnualConfirm();
+  const rows = data?.rows_count ?? _annualParsed.stats.total;
+  const prizes = data?.prizes_count ?? _annualParsed.stats.prized;
+  showAnnualFeedback(
+    `Annual Ranking subido · ${rows} jugadores · ${prizes} premios.`,
+    'ok'
+  );
+  resetAnnualUpload();
+  loadAnnualUploadMeta();
+}
+
 // ── POSTS ─────────────────────────────────────────────────────
 async function loadPosts() {
   let query = sb.from('live_updates')
@@ -5083,6 +5700,16 @@ function switchView(name) {
     chatUnreadCount = 0;
     updateChatBadge();
     loadChatMessages();
+  }
+  if (name === 'annual') {
+    loadAnnualUploadMeta();
+    // Setup idempotente — los listeners se añaden una sola vez por
+    // sesión gracias al flag _annualDragDropReady (se marca tras el
+    // primer setup).
+    if (!window._annualDragDropReady) {
+      setupAnnualDragDrop();
+      window._annualDragDropReady = true;
+    }
   }
 }
 
