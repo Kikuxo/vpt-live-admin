@@ -4870,17 +4870,22 @@ async function readAnnualXlsx(file) {
 
     if (!position || !name) continue;
 
-    // Recolectar festivales con puntos > 0
+    // Recolectar festivales jugados. Convención del XLSX (consistente
+    // con el MVP por festival): celda vacía = no jugó, 0 literal =
+    // jugó sin puntuar. Distinguimos ambos para que el breakdown
+    // refleje los festivales realmente disputados (incluyendo los
+    // de 0 puntos), mientras que las celdas vacías quedan fuera.
     const tempFests = [];
     for (const fc of ANNUAL_FESTIVAL_COLS) {
-      const pts = Number(r[fc.col]) || 0;
-      if (pts > 0) {
-        tempFests.push({
-          name: fc.name,
-          points: pts,
-          isFinal: fc.name.toLowerCase().includes('final'),
-        });
-      }
+      const cell = r[fc.col];
+      if (cell === null || cell === undefined || cell === '') continue;
+      const pts = Number(cell);
+      if (isNaN(pts) || pts < 0) continue;
+      tempFests.push({
+        name: fc.name,
+        points: pts,
+        isFinal: fc.name.toLowerCase().includes('final'),
+      });
     }
 
     // Marcar counted: top 5 (excluyendo Final) por puntos desc +
