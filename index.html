@@ -4888,21 +4888,28 @@ async function readAnnualXlsx(file) {
       });
     }
 
-    // Marcar counted: top 5 (excluyendo Final) por puntos desc +
-    // Final siempre cuenta. Si jugó <5 festivales no-Final, todos
-    // van como counted=true.
+    // Marcar counted: top 5 NO-Final con puntos > 0 + Final con
+    // puntos > 0. Festivales con 0 puntos NUNCA cuentan al ranking
+    // (aunque se preserven en breakdown para reflejar participación
+    // y mantener cuadre con festivals_count). El filtro `points > 0`
+    // dentro de sortedNonFinal hace que jugadores con N festivales
+    // pero algunos con 0 sumen los demás como "best 5 disponibles".
     const sortedNonFinal = tempFests
-      .filter((f) => !f.isFinal)
+      .filter((f) => !f.isFinal && f.points > 0)
       .sort((a, b) => b.points - a.points);
     const top5Names = new Set(
       sortedNonFinal.slice(0, 5).map((f) => f.name)
     );
 
-    const breakdown = tempFests.map((f) => ({
-      name: f.name,
-      points: f.points,
-      counted: f.isFinal || top5Names.has(f.name),
-    }));
+    const breakdown = tempFests.map((f) => {
+      const isFinalWithPoints = f.isFinal && f.points > 0;
+      const isInTop5 = top5Names.has(f.name);
+      return {
+        name: f.name,
+        points: f.points,
+        counted: isFinalWithPoints || isInTop5,
+      };
+    });
     if (breakdown.length > 0) withBreakdown++;
 
     // Bonuses (P-U = cols 15-20). Solo guardamos si alguno > 0.
