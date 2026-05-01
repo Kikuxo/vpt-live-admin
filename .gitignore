@@ -33,3 +33,5 @@ yarn-error.log*
 
 # Supabase CLI local
 .supabase/
+supabase/.temp/
+supabase/_dump/
