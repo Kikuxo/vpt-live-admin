@@ -3331,24 +3331,24 @@ async function login() {
     return;
   }
 
-  // Verificar que el usuario es admin
-  const { data: adminData, error: adminError } = await sb
-    .from('live_admins')
-    .select('id, name')
-    .eq('user_id', data.user.id)
+  // Verificar role: solo staff o admin pueden acceder al panel
+  const { data: userData, error: userError } = await sb
+    .from('users')
+    .select('id, name, email, role')
+    .eq('id', data.user.id)
     .single();
 
-  if (adminError || !adminData) {
-    // No es admin — cerrar sesión y rechazar
+  if (userError || !userData || !['staff', 'admin'].includes(userData.role)) {
+    // No es staff/admin — cerrar sesión y rechazar
     await sb.auth.signOut();
-    err.textContent = '⛔ Acceso restringido. Solo administradores VPT pueden acceder.';
+    err.textContent = '⛔ Acceso restringido. Solo personal VPT (staff o admin).';
     err.style.display = 'block';
     btn.disabled = false;
     btn.textContent = 'Entrar';
     return;
   }
 
-  showApp(data.user, adminData.name);
+  showApp(data.user, userData.name, userData.role);
 }
 
 async function logout() {
@@ -3361,7 +3361,11 @@ async function logout() {
   document.getElementById('login-screen').style.display = 'flex';
 }
 
-function showApp(user, adminName) {
+// Role del usuario actual (staff/admin) — accesible globalmente para UI condicional.
+let currentRole = null;
+
+function showApp(user, adminName, role) {
+  currentRole = role || null;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 
@@ -8118,14 +8122,14 @@ function handleChatRealtimeUpdate(row) {
 (async () => {
   const { data } = await sb.auth.getSession();
   if (data?.session?.user) {
-    // Verificar admin también al restaurar sesión
-    const { data: adminData } = await sb
-      .from('live_admins')
-      .select('id, name')
-      .eq('user_id', data.session.user.id)
+    // Verificar role staff/admin al restaurar sesión
+    const { data: userData } = await sb
+      .from('users')
+      .select('id, name, email, role')
+      .eq('id', data.session.user.id)
       .single();
-    if (adminData) {
-      showApp(data.session.user, adminData.name);
+    if (userData && ['staff', 'admin'].includes(userData.role)) {
+      showApp(data.session.user, userData.name, userData.role);
     } else {
       await sb.auth.signOut();
     }
